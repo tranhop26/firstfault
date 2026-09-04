@@ -36,7 +36,21 @@ def test_creation_binds_caller_as_buyer_and_creates_three_assigned_steps(
         publisher,
     )
 
-    workflow = json.loads(contract.get_workflow("wf-1"))
+    workflow_json = contract.get_workflow("wf-1")
+    assert workflow_json == (
+        "{"
+        f"\"buyer\":\"{to_hex(direct_alice)}\","
+        "\"deposited\":\"0\","
+        f"\"orchestrator\":\"{to_hex(orchestrator)}\","
+        "\"outcome\":\"\","
+        "\"paid\":\"0\","
+        "\"refunded\":\"0\","
+        "\"reserved\":\"0\","
+        "\"state\":\"DRAFT\","
+        "\"workflow_id\":\"wf-1\""
+        "}"
+    )
+    workflow = json.loads(workflow_json)
     assert workflow["buyer"] == to_hex(direct_alice)
     assert workflow["orchestrator"] == to_hex(orchestrator)
     assert workflow["state"] == "DRAFT"
@@ -52,7 +66,20 @@ def test_creation_binds_caller_as_buyer_and_creates_three_assigned_steps(
         (2, publisher, "Publish the approved draft without changes.", "23", "300"),
     ]
     for index, worker, brief, amount, deadline in expected:
-        step = json.loads(contract.get_step("wf-1", index))
+        step_json = contract.get_step("wf-1", index)
+        if index == 0:
+            assert step_json == (
+                "{"
+                "\"amount\":\"11\","
+                "\"brief\":\"Find verifiable primary sources.\","
+                "\"deadline\":\"100\","
+                "\"state\":\"PENDING\","
+                "\"step_index\":0,"
+                f"\"worker\":\"{to_hex(direct_bob)}\","
+                "\"workflow_id\":\"wf-1\""
+                "}"
+            )
+        step = json.loads(step_json)
         assert step == {
             "amount": amount,
             "brief": brief,
@@ -86,6 +113,98 @@ def test_creation_rejects_duplicate_workflow_id_and_reused_nonce(
             workflow_id="wf-2",
             nonce="create-1",
         )
+
+
+def test_rejected_creation_checks_do_not_consume_their_nonces(
+    direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie, direct_accounts
+):
+    """Break caught: a rejected malformed or duplicate create permanently burns its nonce."""
+    contract = direct_deploy("contracts/firstfault.py")
+    orchestrator, publisher = direct_accounts[:2]
+    direct_vm.sender = direct_alice
+
+    invalid_terms = workflow_terms()
+    invalid_terms["writer_amount"] = 0
+    with direct_vm.expect_revert("Amounts must be positive"):
+        contract.create_workflow(
+            "wf-invalid",
+            to_address(orchestrator),
+            to_address(direct_bob),
+            to_address(direct_charlie),
+            to_address(publisher),
+            nonce="reuse-invalid",
+            **invalid_terms,
+        )
+    create_workflow(
+        contract,
+        orchestrator,
+        direct_bob,
+        direct_charlie,
+        publisher,
+        workflow_id="wf-after-invalid",
+        nonce="reuse-invalid",
+    )
+
+    create_workflow(
+        contract,
+        orchestrator,
+        direct_bob,
+        direct_charlie,
+        publisher,
+        workflow_id="wf-duplicate-source",
+        nonce="duplicate-source",
+    )
+    with direct_vm.expect_revert("Workflow already exists"):
+        create_workflow(
+            contract,
+            orchestrator,
+            direct_bob,
+            direct_charlie,
+            publisher,
+            workflow_id="wf-duplicate-source",
+            nonce="reuse-duplicate",
+        )
+    create_workflow(
+        contract,
+        orchestrator,
+        direct_bob,
+        direct_charlie,
+        publisher,
+        workflow_id="wf-after-duplicate",
+        nonce="reuse-duplicate",
+    )
+
+
+def test_unauthorized_lifecycle_calls_do_not_consume_their_nonces(
+    direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie, direct_accounts
+):
+    """Break caught: rejected unauthorized cancellation or start permanently burns its nonce."""
+    contract = direct_deploy("contracts/firstfault.py")
+    orchestrator, publisher = direct_accounts[:2]
+    direct_vm.sender = direct_alice
+    create_workflow(contract, orchestrator, direct_bob, direct_charlie, publisher)
+
+    direct_vm.sender = direct_bob
+    with direct_vm.expect_revert("Buyer only"):
+        contract.cancel_workflow("wf-1", "reuse-cancel")
+    direct_vm.sender = direct_alice
+    contract.cancel_workflow("wf-1", "reuse-cancel")
+
+    create_workflow(
+        contract,
+        orchestrator,
+        direct_bob,
+        direct_charlie,
+        publisher,
+        workflow_id="wf-start",
+        nonce="create-start",
+    )
+    direct_vm.sender = direct_bob
+    with direct_vm.expect_revert("Orchestrator only"):
+        contract.start_workflow("wf-start", "reuse-start")
+    direct_vm.sender = orchestrator
+    contract.start_workflow("wf-start", "reuse-start")
+    assert json.loads(contract.get_workflow("wf-start"))["state"] == "IN_PROGRESS"
 
 
 @pytest.mark.parametrize(

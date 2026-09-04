@@ -14,7 +14,7 @@
 - Studionet GEN is simulated value, not production money or production escrow.
 - The contract is `INTENTIONALLY_FROZEN`; no upgrade method, owner verdict override, or mutable adjudication prompt.
 - Use the exact version header and `Depends` hash from the current Studio default template at implementation time.
-- Use `from genlayer import *`; one `gl.Contract` subclass named `Contract` per module.
+- Use `from genlayer import *` and exactly one `gl.Contract` subclass per module. Current pinned-runner exception: name the FirstFault subclass `FirstFault`, not literal `Contract`, because the installed `genvm-lint` ABI reflection excludes a module class named `Contract`; retain this name until the linter/toolchain is upgraded and the literal-name form validates.
 - Persistent money uses `bigint`; bounded counters use sized integers; no bare `int`, `dict`, `list`, or `float` in storage.
 - Public mappings and project policy use `str` keys. Custom storage structures use `@allow_storage @dataclass`.
 - Do not assign `TreeMap()` or `DynArray()` inside `__init__`.
