@@ -18,6 +18,8 @@ class Workflow:
     outcome: str
     deposited: bigint
     reserved: bigint
+    payout_scheduled: bigint
+    refund_scheduled: bigint
     paid: bigint
     refunded: bigint
 
@@ -116,6 +118,8 @@ class FirstFault(gl.Contract):
             outcome="",
             deposited=0,
             reserved=0,
+            payout_scheduled=0,
+            refund_scheduled=0,
             paid=0,
             refunded=0,
         )
@@ -156,13 +160,17 @@ class FirstFault(gl.Contract):
         self._consume_nonce(nonce)
         refund_amount = workflow.reserved
         workflow.reserved = 0
-        workflow.refunded += refund_amount
-        workflow.state = "CANCELLED"
-        workflow.outcome = "CANCELLED"
+        workflow.refund_scheduled += refund_amount
+        if refund_amount > 0:
+            workflow.state = "CANCELED_PENDING_FINALITY"
+            workflow.outcome = "CANCELED_PENDING_FINALITY"
+        else:
+            workflow.state = "CANCELED"
+            workflow.outcome = "CANCELED"
         self.workflows[workflow_id] = workflow
         for step_index in range(3):
             step = self._step(workflow_id, step_index)
-            step.state = "REFUNDED" if refund_amount > 0 else "CANCELLED"
+            step.state = "REFUND_SCHEDULED" if refund_amount > 0 else "CANCELED"
             self.steps[workflow_id + ":" + str(step_index)] = step
         if refund_amount > 0:
             gl.get_contract_at(workflow.buyer).emit_transfer(value=u256(refund_amount))
@@ -197,20 +205,20 @@ class FirstFault(gl.Contract):
     @gl.public.write
     def accept_workflow(self, workflow_id: str, nonce: str) -> None:
         workflow = self._workflow(workflow_id)
-        self._require_sender(workflow.orchestrator, "Orchestrator only")
+        self._require_sender(workflow.buyer, "Buyer only")
         self._require_state(workflow, "IN_PROGRESS")
         if workflow.reserved == 0:
             raise gl.vm.UserError("Reserved funds required")
         self._consume_nonce(nonce)
         payout_amount = workflow.reserved
         workflow.reserved = 0
-        workflow.paid += payout_amount
-        workflow.state = "ACCEPTED"
-        workflow.outcome = "ACCEPTED"
+        workflow.payout_scheduled += payout_amount
+        workflow.state = "ACCEPTED_PENDING_FINALITY"
+        workflow.outcome = "ACCEPTED_PENDING_FINALITY"
         self.workflows[workflow_id] = workflow
         for step_index in range(3):
             step = self._step(workflow_id, step_index)
-            step.state = "PAID"
+            step.state = "PAYOUT_SCHEDULED"
             self.steps[workflow_id + ":" + str(step_index)] = step
             gl.get_contract_at(step.worker).emit_transfer(value=u256(step.amount))
 
@@ -224,7 +232,9 @@ class FirstFault(gl.Contract):
                 "orchestrator": workflow.orchestrator.as_hex,
                 "outcome": workflow.outcome,
                 "paid": str(workflow.paid),
+                "payout_scheduled": str(workflow.payout_scheduled),
                 "refunded": str(workflow.refunded),
+                "refund_scheduled": str(workflow.refund_scheduled),
                 "reserved": str(workflow.reserved),
                 "state": workflow.state,
                 "workflow_id": workflow.workflow_id,
@@ -238,7 +248,9 @@ class FirstFault(gl.Contract):
             {
                 "deposited": str(workflow.deposited),
                 "paid": str(workflow.paid),
+                "payout_scheduled": str(workflow.payout_scheduled),
                 "refunded": str(workflow.refunded),
+                "refund_scheduled": str(workflow.refund_scheduled),
                 "reserved": str(workflow.reserved),
             }
         )

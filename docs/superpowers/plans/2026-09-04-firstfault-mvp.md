@@ -15,7 +15,7 @@
 - The contract is `INTENTIONALLY_FROZEN`; no upgrade method, owner verdict override, or mutable adjudication prompt.
 - Use the exact version header and `Depends` hash from the current Studio default template at implementation time.
 - Use `from genlayer import *` and exactly one `gl.Contract` subclass per module. Current pinned-runner exception: name the FirstFault subclass `FirstFault`, not literal `Contract`, because the installed `genvm-lint` ABI reflection excludes a module class named `Contract`; retain this name until the linter/toolchain is upgraded and the literal-name form validates.
-- Persistent money uses `bigint`; bounded counters use sized integers; no bare `int`, `dict`, `list`, or `float` in storage.
+- Persistent money uses `bigint`; bounded counters use sized integers; no bare `int`, `dict`, `list`, or `float` in storage. Before authoritative child-transfer reconciliation, money is represented as `reserved`, `payout_scheduled`, or `refund_scheduled`; scheduled value is not `paid` or `refunded`.
 - Public mappings and project policy use `str` keys. Custom storage structures use `@allow_storage @dataclass`.
 - Do not assign `TreeMap()` or `DynArray()` inside `__init__`.
 - Every nondeterministic call lives inside `gl.eq_principle.*` or `gl.vm.run_nondet`; custom semantic validation defaults to `gl.vm.run_nondet`.
@@ -157,7 +157,7 @@ firstfault/
 
 - [ ] **Step 3: Add storage structures**
 
-  Define `Workflow` and `Step` with `@allow_storage @dataclass`. Store them in `TreeMap[str, Workflow]` and `TreeMap[str, Step]`, using `workflow_id + ":" + str(step_index)` as the step key. Store `deposited`, `reserved`, `paid`, and `refunded` as `bigint`; store state/outcome as explicit strings.
+  Define `Workflow` and `Step` with `@allow_storage @dataclass`. Store them in `TreeMap[str, Workflow]` and `TreeMap[str, Step]`, using `workflow_id + ":" + str(step_index)` as the step key. Store `deposited`, `reserved`, `payout_scheduled`, `refund_scheduled`, `paid`, and `refunded` as `bigint`; store state/outcome as explicit strings.
 
 - [ ] **Step 4: Implement deterministic guards and views**
 
@@ -177,15 +177,15 @@ firstfault/
 
 **Interfaces:**
 - `fund_workflow(workflow_id: str, nonce: str) -> None` is `@gl.public.write.payable`.
-- `accept_workflow(workflow_id: str, nonce: str) -> None` schedules three stored worker transfers.
-- `get_accounting(workflow_id: str) -> str` returns `deposited`, `reserved`, `paid`, and `refunded` as decimal strings.
+- `accept_workflow(workflow_id: str, nonce: str) -> None` is buyer-only and schedules three stored worker transfers.
+- `get_accounting(workflow_id: str) -> str` returns `deposited`, `reserved`, `payout_scheduled`, `refund_scheduled`, `paid`, and `refunded` as decimal strings.
 
 - [ ] **Step 1: Write custody tests first**
 
   Test zero, partial, excess, duplicate, and unauthorized funding; cancellation refund before start; rejection after start; repeated acceptance; one terminal disposition per hold; and:
 
   ```python
-  assert deposited == reserved + paid + refunded
+  assert deposited == reserved + payout_scheduled + refund_scheduled + paid + refunded
   ```
 
 - [ ] **Step 2: Verify RED**
@@ -198,7 +198,7 @@ firstfault/
 
 - [ ] **Step 4: Implement acceptance and pre-start cancellation**
 
-  `accept_workflow` consumes all three holds, updates accounting before scheduling messages, and rejects any repeated decision. Cancellation refunds the entire reserved amount only if no worker has started.
+  `accept_workflow` is buyer-only, consumes all three holds into `payout_scheduled`, writes `ACCEPTED_PENDING_FINALITY`/`PAYOUT_SCHEDULED` before scheduling messages, and rejects any repeated decision. Cancellation moves the entire unstarted reserved amount into `refund_scheduled` with `CANCELED_PENDING_FINALITY`/`REFUND_SCHEDULED`. Scheduled transfers are not recorded as `paid` or `refunded` until a later authoritative reconciliation task.
 
 - [ ] **Step 5: Run GREEN gates and commit**
 
@@ -272,7 +272,7 @@ firstfault/
 
 - [ ] **Step 6: Schedule verdict-bound transfers**
 
-  For `FIRST_BREACH`, pay each stored compliant worker and refund the stored breached hold to the buyer. Update `reserved`, `paid`, and `refunded` exactly once before scheduling external messages.
+  For `FIRST_BREACH`, schedule each stored compliant worker payout and breached-hold buyer refund. Update `reserved`, `payout_scheduled`, and `refund_scheduled` exactly once before scheduling external messages; do not mark scheduled transfers `paid` or `refunded` without later authoritative reconciliation.
 
 - [ ] **Step 7: Run GREEN gates and commit**
 

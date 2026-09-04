@@ -34,11 +34,11 @@ The adjudication uses `gl.vm.run_nondet` with a custom validator. `run_nondet_un
 
 Amounts and recipients come only from deterministic contract storage. The LLM cannot create transfer instructions. Transfer messages are scheduled in the decision transaction and emitted under GenLayer finalization semantics; there is no separate application-level `settle()` method.
 
-The conservation invariant is:
+Before child-transfer execution is authoritatively observed, the conservation invariant is:
 
-`deposited = reserved + paid + refunded`
+`deposited = reserved + payout_scheduled + refund_scheduled + paid + refunded`
 
-Each hold can have exactly one terminal disposition.
+`PAYOUT_SCHEDULED` and `REFUND_SCHEDULED` mean only that a finalized child message was scheduled. They are not recipient-balance proof. `paid` and `refunded` remain zero until a later authoritative reconciliation proves child execution. Each hold can have exactly one scheduling or completed disposition.
 
 ## State machine
 
@@ -47,6 +47,7 @@ Each hold can have exactly one terminal disposition.
 From review:
 
 - `accept_workflow → ACCEPTED_PENDING_FINALITY → SETTLED_SUCCESS`
+- `cancel_workflow` with funded holds `→ CANCELED_PENDING_FINALITY → SETTLED_SUCCESS`
 - `open_dispute → DISPUTED → ADJUDICATING → DECISION_PENDING_FINALITY → SETTLED_BREACH`
 - insufficient evidence/consensus → `UNRESOLVED`
 
@@ -55,6 +56,7 @@ Recovery branches:
 - `UNRESOLVED → CURE_SUBMITTED → ADJUDICATING`, once.
 - `UNRESOLVED → MUTUAL_PROPOSED → MUTUAL_APPROVED → SETTLED_MUTUAL`, requiring on-chain approval from every affected party.
 - Cancellation is allowed only before any worker starts.
+- The buyer alone may accept or cancel their funded workflow; the orchestrator may start a funded workflow but cannot release buyer-held GEN.
 
 Every transition checks actor, current state, deadline, nonce, evidence binding, and terminal-state immutability.
 
@@ -97,4 +99,3 @@ Completion requires lint, frontend production build, direct tests, integration t
 ## Recoverability
 
 V1 has no upgrade or owner-verdict path. If a bug is found, the frontend stops creating new V1 workflows, affected states are disclosed, and V2 is deployed at a new address. Existing V1 holds can move only through V1's predefined terminal paths; no administrator can migrate them by assertion.
-

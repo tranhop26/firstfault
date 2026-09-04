@@ -44,6 +44,8 @@ def test_creation_binds_caller_as_buyer_and_creates_three_assigned_steps(
         f"\"orchestrator\":\"{to_hex(orchestrator)}\","
         "\"outcome\":\"\","
         "\"paid\":\"0\","
+        "\"payout_scheduled\":\"0\","
+        "\"refund_scheduled\":\"0\","
         "\"refunded\":\"0\","
         "\"reserved\":\"0\","
         "\"state\":\"DRAFT\","
@@ -58,7 +60,9 @@ def test_creation_binds_caller_as_buyer_and_creates_three_assigned_steps(
     assert workflow["deposited"] == "0"
     assert workflow["reserved"] == "0"
     assert workflow["paid"] == "0"
+    assert workflow["payout_scheduled"] == "0"
     assert workflow["refunded"] == "0"
+    assert workflow["refund_scheduled"] == "0"
 
     expected = [
         (0, direct_bob, "Find verifiable primary sources.", "11", "100"),
@@ -262,7 +266,7 @@ def test_only_buyer_can_cancel_before_the_workflow_starts(
 
     direct_vm.sender = direct_alice
     contract.cancel_workflow("wf-1", "cancel-buyer")
-    assert json.loads(contract.get_workflow("wf-1"))["state"] == "CANCELLED"
+    assert json.loads(contract.get_workflow("wf-1"))["state"] == "CANCELED"
 
     direct_vm.sender = orchestrator
     with direct_vm.expect_revert("Invalid state"):
