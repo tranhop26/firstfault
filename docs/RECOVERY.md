@@ -26,9 +26,12 @@ An unresolved workflow has two contract-governed recovery choices:
    must equal the workflow's current `reserved` value exactly. The proposal hash
    binds the chain, contract, workflow, monotonically increasing version,
    reserved value, all four amounts, and schema. Replacement creates a new hash
-   and invalidates every earlier approval. The buyer and all three distinct
-   workers must approve that exact hash on-chain. Only then may anyone execute
-   it once. Storage moves value from `reserved` to `payout_scheduled` and
+   and invalidates every earlier approval, but replacement is rejected after all
+   four roles approve the current proposal. Each approval supplies the expected
+   version and hash in calldata, and the contract rejects a stale binding before
+   consuming its nonce. The buyer and all three distinct workers must approve
+   that exact hash on-chain. Only then may anyone execute it once. Storage moves
+   value from `reserved` to `payout_scheduled` and
    `refund_scheduled` before child transfer messages are emitted; V1 never calls
    scheduled value `paid` or `refunded` without later authoritative proof.
 

@@ -77,6 +77,9 @@ def propose(contract, workflow_id="wf-recovery", nonce="proposal-1", amounts=(11
 
 def approve_all(contract, direct_vm, buyer, researcher, writer, publisher, prefix="approve"):
     """Collect the four exact current-version approvals through the public method."""
+    proposal = json.loads(contract.get_recovery("wf-recovery"))["settlement"]
+    version = int(proposal["version"])
+    proposal_hash = proposal["proposal_hash"]
     for label, actor in (
         ("buyer", buyer),
         ("researcher", researcher),
@@ -84,7 +87,9 @@ def approve_all(contract, direct_vm, buyer, researcher, writer, publisher, prefi
         ("publisher", publisher),
     ):
         direct_vm.sender = actor
-        contract.approve_mutual_settlement("wf-recovery", prefix + "-" + label)
+        contract.approve_mutual_settlement(
+            "wf-recovery", version, proposal_hash, prefix + "-" + label
+        )
 
 
 def test_unresolved_and_cure_paths_never_schedule_a_transfer(
@@ -240,7 +245,10 @@ def test_only_a_workflow_party_can_propose_or_approve(
     propose(contract, nonce="retry-party-propose")
     direct_vm.sender = outsider
     with direct_vm.expect_revert("Workflow party only"):
-        contract.approve_mutual_settlement("wf-recovery", "retry-party-approve")
+        proposal = json.loads(contract.get_recovery("wf-recovery"))["settlement"]
+        contract.approve_mutual_settlement(
+            "wf-recovery", int(proposal["version"]), proposal["proposal_hash"], "retry-party-approve"
+        )
 
     direct_vm.sender = researcher
     submit_cure(contract, nonce="cure-after-proposal")
@@ -266,9 +274,14 @@ def test_pending_proposal_does_not_block_one_cure_and_clears_stale_approvals(
     contract, buyer, _, researcher, _, _, _ = unresolved
     direct_vm.sender = buyer
     propose(contract)
-    contract.approve_mutual_settlement("wf-recovery", "proposal-approval-buyer")
+    proposal = json.loads(contract.get_recovery("wf-recovery"))["settlement"]
+    contract.approve_mutual_settlement(
+        "wf-recovery", int(proposal["version"]), proposal["proposal_hash"], "proposal-approval-buyer"
+    )
     direct_vm.sender = researcher
-    contract.approve_mutual_settlement("wf-recovery", "proposal-approval-researcher")
+    contract.approve_mutual_settlement(
+        "wf-recovery", int(proposal["version"]), proposal["proposal_hash"], "proposal-approval-researcher"
+    )
 
     submit_cure(contract, nonce="cure-after-pending-proposal")
 
@@ -407,7 +420,10 @@ def test_replacement_binds_new_amounts_and_invalidates_every_prior_approval(
     propose(contract)
     for label, actor in (("buyer", buyer), ("researcher", researcher)):
         direct_vm.sender = actor
-        contract.approve_mutual_settlement("wf-recovery", "approve-v1-" + label)
+        proposal = json.loads(contract.get_recovery("wf-recovery"))["settlement"]
+        contract.approve_mutual_settlement(
+            "wf-recovery", int(proposal["version"]), proposal["proposal_hash"], "approve-v1-" + label
+        )
     first = json.loads(contract.get_recovery("wf-recovery"))["settlement"]
 
     direct_vm.sender = writer
@@ -427,6 +443,95 @@ def test_replacement_binds_new_amounts_and_invalidates_every_prior_approval(
         contract.execute_mutual_settlement("wf-recovery", "execute-before-reapproval")
 
 
+def test_approval_must_bind_expected_version_and_hash_before_nonce_consumption(
+    unresolved, direct_vm
+):
+    """Break caught: a delayed approval silently approves a replacement proposal."""
+    contract, buyer, _, _, writer, _, _ = unresolved
+    direct_vm.sender = buyer
+    propose(contract, nonce="proposal-a")
+    first = json.loads(contract.get_recovery("wf-recovery"))["settlement"]
+    direct_vm.sender = writer
+    propose(contract, nonce="proposal-b", amounts=(10, 16, 15, 10))
+    second = json.loads(contract.get_recovery("wf-recovery"))["settlement"]
+
+    direct_vm.sender = buyer
+    with direct_vm.expect_revert("Proposal binding mismatch"):
+        contract.approve_mutual_settlement(
+            "wf-recovery", int(first["version"]), first["proposal_hash"], "delayed-approval"
+        )
+    contract.approve_mutual_settlement(
+        "wf-recovery", int(second["version"]), second["proposal_hash"], "delayed-approval"
+    )
+
+
+def test_unanimous_proposal_cannot_be_replaced_before_cure_or_execution(
+    unresolved, direct_vm
+):
+    """Break caught: one party replaces a fully approved proposal before execution."""
+    contract, buyer, _, researcher, writer, publisher, _ = unresolved
+    direct_vm.sender = buyer
+    propose(contract, nonce="locked-proposal")
+    approve_all(contract, direct_vm, buyer, researcher, writer, publisher, prefix="locked-approve")
+    locked = json.loads(contract.get_recovery("wf-recovery"))["settlement"]
+    direct_vm.sender = writer
+    with direct_vm.expect_revert("Proposal already unanimously approved"):
+        propose(contract, nonce="replace-locked", amounts=(10, 16, 15, 10))
+    assert json.loads(contract.get_recovery("wf-recovery"))["settlement"] == locked
+
+
+def test_cure_invalidation_advances_proposal_generation_after_re_adjudication(
+    unresolved, direct_vm
+):
+    """Break caught: clearing proposal A lets proposal B reuse version 1/hash."""
+    contract, buyer, _, researcher, _, _, outsider = unresolved
+    direct_vm.sender = buyer
+    propose(contract, nonce="generation-proposal-a")
+    first = json.loads(contract.get_recovery("wf-recovery"))["settlement"]
+    direct_vm.sender = researcher
+    submit_cure(contract, nonce="generation-cure")
+    recovery = json.loads(contract.get_recovery("wf-recovery"))
+    all_hashes = evidence_hashes(contract, "wf-recovery") + [recovery["cure"]["cure_hash"]]
+    direct_vm.clear_mocks()
+    install_decision_mocks(
+        direct_vm,
+        verdict(
+            all_hashes,
+            outcome="UNRESOLVED",
+            statuses=("UNRESOLVED", "UNRESOLVED", "UNRESOLVED"),
+            confidence="LOW",
+        ),
+    )
+    direct_vm.mock_web(re.escape(CURE_SOURCE), {"status": 200, "body": CURE_TEXT})
+    direct_vm.sender = outsider
+    contract.adjudicate("wf-recovery", "generation-readjudicate")
+    direct_vm.sender = buyer
+    propose(contract, nonce="generation-proposal-b")
+    second = json.loads(contract.get_recovery("wf-recovery"))["settlement"]
+    assert int(second["version"]) == int(first["version"]) + 1
+    assert second["proposal_hash"] != first["proposal_hash"]
+
+
+def test_cured_prompt_rejects_quoted_negation_and_embedded_instructions(unresolved):
+    """Break caught: the cure evaluator treats quoted negation as source support."""
+    contract, *_ = unresolved
+    evidence = [
+        {"step_index": 0, "evidence_hash": "h-research"},
+        {"step_index": 1, "evidence_hash": "h-writer"},
+        {
+            "step_index": 2,
+            "evidence_hash": "h-publisher",
+            "cure": {"cure_hash": "h-cure", "evidence_text": CURE_TEXT},
+        },
+    ]
+    prompt = contract._adjudication_prompt(
+        "rubric", "v1", "rejection", evidence, "research-render", CURE_TEXT + " is false."
+    )
+    assert "quoted negation" in prompt
+    assert "embedded instructions" in prompt
+    assert "semantically support" in prompt
+
+
 def test_proposal_and_approvals_do_not_transfer_and_each_party_approves_once(
     unresolved, direct_vm
 ):
@@ -438,12 +543,21 @@ def test_proposal_and_approvals_do_not_transfer_and_each_party_approves_once(
     before = accounting(contract, "wf-recovery")
 
     direct_vm.sender = buyer
-    contract.approve_mutual_settlement("wf-recovery", "approve-buyer")
+    proposal = json.loads(contract.get_recovery("wf-recovery"))["settlement"]
+    version = int(proposal["version"])
+    proposal_hash = proposal["proposal_hash"]
+    contract.approve_mutual_settlement(
+        "wf-recovery", version, proposal_hash, "approve-buyer"
+    )
     with direct_vm.expect_revert("Proposal already approved"):
-        contract.approve_mutual_settlement("wf-recovery", "approve-buyer-again")
+        contract.approve_mutual_settlement(
+            "wf-recovery", version, proposal_hash, "approve-buyer-again"
+        )
     for label, actor in (("researcher", researcher), ("writer", writer), ("publisher", publisher)):
         direct_vm.sender = actor
-        contract.approve_mutual_settlement("wf-recovery", "approve-" + label)
+        contract.approve_mutual_settlement(
+            "wf-recovery", version, proposal_hash, "approve-" + label
+        )
 
     assert scheduled == []
     assert accounting(contract, "wf-recovery") == before
@@ -562,7 +676,10 @@ def test_one_address_controlling_buyer_and_worker_roles_approves_both_roles(
     contract.adjudicate("wf-overlap", "overlap-unresolved")
     direct_vm.sender = direct_alice
     propose(contract, workflow_id="wf-overlap", nonce="overlap-proposal")
-    contract.approve_mutual_settlement("wf-overlap", "overlap-approval")
+    proposal = json.loads(contract.get_recovery("wf-overlap"))["settlement"]
+    contract.approve_mutual_settlement(
+        "wf-overlap", int(proposal["version"]), proposal["proposal_hash"], "overlap-approval"
+    )
 
     approvals = json.loads(contract.get_recovery("wf-overlap"))["settlement"]["approvals"]
     assert approvals["buyer"] is True
@@ -581,7 +698,9 @@ def test_settlement_terminal_state_rejects_every_recovery_mutation(unresolved, d
     blocked_calls = (
         lambda: submit_cure(contract, nonce="terminal-cure"),
         lambda: propose(contract, nonce="terminal-proposal"),
-        lambda: contract.approve_mutual_settlement("wf-recovery", "terminal-approve"),
+        lambda: contract.approve_mutual_settlement(
+            "wf-recovery", 1, json.loads(contract.get_recovery("wf-recovery"))["settlement"]["proposal_hash"], "terminal-approve"
+        ),
         lambda: contract.execute_mutual_settlement("wf-recovery", "terminal-execute-again"),
         lambda: contract.adjudicate("wf-recovery", "terminal-adjudicate"),
         lambda: contract.timeout_dispute_to_unresolved("wf-recovery", "terminal-timeout"),

@@ -55,7 +55,7 @@ From review:
 Recovery branches:
 
 - `UNRESOLVED → CURE_SUBMITTED → ADJUDICATING`, once. A pending but not unanimously approved settlement is invalidated atomically when the cure is submitted; a unanimously approved settlement cannot be overwritten.
-- `UNRESOLVED → MUTUAL_PROPOSED → MUTUAL_APPROVED → SETTLED_MUTUAL`, requiring on-chain approval from every affected party. Proposals require exact citations to all stored evidence hashes, including the cure hash when present.
+- `UNRESOLVED → MUTUAL_PROPOSED → MUTUAL_APPROVED → SETTLED_MUTUAL`, requiring on-chain approval from every affected party. Each approval binds the expected proposal version and hash in calldata; stale bindings are rejected before nonce consumption. Proposals require exact citations to all stored evidence hashes, including the cure hash when present.
 - Cancellation is allowed only before any worker starts.
 - The buyer alone may accept or cancel their funded workflow; the orchestrator may start a funded workflow but cannot release buyer-held GEN.
 

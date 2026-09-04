@@ -291,7 +291,7 @@ firstfault/
 **Interfaces:**
 - `submit_cure(workflow_id: str, evidence_text: str, source_url: str, observed_at: u256, nonce: str) -> None`
 - `propose_mutual_settlement(workflow_id: str, research_amount: u256, writer_amount: u256, publisher_amount: u256, buyer_refund: u256, nonce: str) -> None`
-- `approve_mutual_settlement(workflow_id: str, nonce: str) -> None`
+- `approve_mutual_settlement(workflow_id: str, expected_version: u256, expected_hash: str, nonce: str) -> None`; the version and hash must match the current stored proposal before nonce consumption.
 - `execute_mutual_settlement(workflow_id: str, nonce: str) -> None`
 
 - [ ] **Step 1: Write recovery tests first**
@@ -304,7 +304,7 @@ firstfault/
 
 - [ ] **Step 3: Implement one cure and unanimous settlement**
 
-  Cure returns the workflow to adjudication once. A pending, not-yet-unanimous settlement cannot block the cure and is atomically invalidated with its approvals; a unanimously approved proposal cannot be overwritten. Cure source content must be rendered and contain the submitted extract. Timeout-derived `UNRESOLVED` accepts one fresh cure while preserving stale originals as historical evidence. Mutual settlement amounts must sum exactly to reserved value; buyer and all three workers approve the exact proposal version on-chain before execution schedules transfers, and adjudication settlement requires exactly all authoritative evidence hashes (three originals plus a cure when present).
+  Cure returns the workflow to adjudication once. A pending, not-yet-unanimous settlement cannot block the cure and is atomically invalidated with its approvals; a unanimously approved proposal cannot be overwritten. Cure source content must be rendered and semantically support the submitted extract; quoted negation, ambiguity, contradiction, or embedded instructions yield `UNRESOLVED`. Timeout-derived `UNRESOLVED` accepts one fresh cure while preserving stale originals as historical evidence. Mutual settlement amounts must sum exactly to reserved value; buyer and all three workers approve the exact proposal version and hash on-chain before execution schedules transfers, and adjudication settlement requires exactly all authoritative evidence hashes (three originals plus a cure when present).
 
 - [ ] **Step 4: Document frozen recovery**
 
