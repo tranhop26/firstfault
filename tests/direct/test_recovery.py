@@ -368,6 +368,23 @@ def test_cured_prompt_requires_all_four_authoritative_hashes(unresolved):
     )
     assert "exactly 4" in prompt
     assert "h-cure" in prompt
+    assert "rendered_cure_source" in prompt
+
+
+def test_uncured_prompt_omits_cure_policy_and_absent_cure_source(unresolved):
+    """Break caught: a first-pass dispute is told an absent cure source is unsafe."""
+    contract, *_ = unresolved
+    evidence = [
+        {"step_index": 0, "evidence_hash": "h-research"},
+        {"step_index": 1, "evidence_hash": "h-writer"},
+        {"step_index": 2, "evidence_hash": "h-publisher"},
+    ]
+    prompt = contract._adjudication_prompt(
+        "rubric", "v1", "rejection", evidence, "research-render"
+    )
+    assert "rendered_cure_source" not in prompt
+    assert "semantically support the submitted cure claim" not in prompt
+    assert "quoted negation" not in prompt
 
 
 def test_timeout_unresolved_accepts_one_fresh_cure_as_new_evidence_anchor(

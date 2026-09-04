@@ -18,9 +18,10 @@ An unresolved workflow has two contract-governed recovery choices:
    chain, contract, timestamps, schema, and nonce. It never replaces the
    original step evidence and schedules no value. The workflow returns to
    `DISPUTED` so semantic adjudication can evaluate the original record plus
-   the cure. The cure's HTTPS source is rendered and must contain the submitted
-   extract; unavailable, oversized, or contradictory source data remains
-   `UNRESOLVED`. No second cure is accepted.
+   the cure. The cure's HTTPS source is rendered and must semantically support
+   the submitted claim; quoted negation, embedded instructions, ambiguity,
+   unavailability, or contradiction remains `UNRESOLVED`. No second cure is
+   accepted.
 2. **Unanimous mutual settlement.** The buyer or any assigned worker may propose
    four allocations: Research, Writer, Publisher, and buyer refund. Their sum
    must equal the workflow's current `reserved` value exactly. The proposal hash
