@@ -375,6 +375,10 @@ firstfault/
 - `useFirstFault(workflowId)` exposes contract reads, role-authorized writes, transaction lifecycle, triggered transfers, and refresh-safe readback.
 - `projectTransactionStatus(receipt, triggeredReceipts, readback)` returns one explicit UI status without claiming success early.
 
+- [ ] **Step 0: Stop for the user's visual-direction choice**
+
+  Before editing any visible UI, present three distinct responsive mockup directions using the already-fixed workflow and status requirements. The user chooses the visual direction; preserve that choice as the UI acceptance reference. Do not let an implementer select the look autonomously.
+
 - [ ] **Step 1: Write status projection and component tests first**
 
   Assert that submitted/accepted never renders `Paid`; finalized without child success renders `Transfer pending`; error remains visible; unresolved shows held funds; disconnected and wrong-network states disable writes; refresh derives state from readback.
