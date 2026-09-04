@@ -151,20 +151,68 @@ class FirstFault(gl.Contract):
     def cancel_workflow(self, workflow_id: str, nonce: str) -> None:
         workflow = self._workflow(workflow_id)
         self._require_sender(workflow.buyer, "Buyer only")
-        self._require_state(workflow, "DRAFT")
+        if workflow.state != "DRAFT" and workflow.state != "FUNDED":
+            raise gl.vm.UserError("Invalid state")
         self._consume_nonce(nonce)
+        refund_amount = workflow.reserved
+        workflow.reserved = 0
+        workflow.refunded += refund_amount
         workflow.state = "CANCELLED"
         workflow.outcome = "CANCELLED"
+        self.workflows[workflow_id] = workflow
+        for step_index in range(3):
+            step = self._step(workflow_id, step_index)
+            step.state = "REFUNDED" if refund_amount > 0 else "CANCELLED"
+            self.steps[workflow_id + ":" + str(step_index)] = step
+        if refund_amount > 0:
+            gl.get_contract_at(workflow.buyer).emit_transfer(value=u256(refund_amount))
+
+    @gl.public.write.payable
+    def fund_workflow(self, workflow_id: str, nonce: str) -> None:
+        workflow = self._workflow(workflow_id)
+        self._require_sender(workflow.buyer, "Buyer only")
+        self._require_state(workflow, "DRAFT")
+        expected_amount = (
+            self._step(workflow_id, 0).amount
+            + self._step(workflow_id, 1).amount
+            + self._step(workflow_id, 2).amount
+        )
+        if gl.message.value != expected_amount:
+            raise gl.vm.UserError("Exact funding required")
+        self._consume_nonce(nonce)
+        workflow.deposited += gl.message.value
+        workflow.reserved += gl.message.value
+        workflow.state = "FUNDED"
         self.workflows[workflow_id] = workflow
 
     @gl.public.write
     def start_workflow(self, workflow_id: str, nonce: str) -> None:
         workflow = self._workflow(workflow_id)
         self._require_sender(workflow.orchestrator, "Orchestrator only")
-        self._require_state(workflow, "DRAFT")
+        self._require_state(workflow, "FUNDED")
         self._consume_nonce(nonce)
         workflow.state = "IN_PROGRESS"
         self.workflows[workflow_id] = workflow
+
+    @gl.public.write
+    def accept_workflow(self, workflow_id: str, nonce: str) -> None:
+        workflow = self._workflow(workflow_id)
+        self._require_sender(workflow.orchestrator, "Orchestrator only")
+        self._require_state(workflow, "IN_PROGRESS")
+        if workflow.reserved == 0:
+            raise gl.vm.UserError("Reserved funds required")
+        self._consume_nonce(nonce)
+        payout_amount = workflow.reserved
+        workflow.reserved = 0
+        workflow.paid += payout_amount
+        workflow.state = "ACCEPTED"
+        workflow.outcome = "ACCEPTED"
+        self.workflows[workflow_id] = workflow
+        for step_index in range(3):
+            step = self._step(workflow_id, step_index)
+            step.state = "PAID"
+            self.steps[workflow_id + ":" + str(step_index)] = step
+            gl.get_contract_at(step.worker).emit_transfer(value=u256(step.amount))
 
     @gl.public.view
     def get_workflow(self, workflow_id: str) -> str:
@@ -180,6 +228,18 @@ class FirstFault(gl.Contract):
                 "reserved": str(workflow.reserved),
                 "state": workflow.state,
                 "workflow_id": workflow.workflow_id,
+            }
+        )
+
+    @gl.public.view
+    def get_accounting(self, workflow_id: str) -> str:
+        workflow = self._workflow(workflow_id)
+        return self._canonical_json(
+            {
+                "deposited": str(workflow.deposited),
+                "paid": str(workflow.paid),
+                "refunded": str(workflow.refunded),
+                "reserved": str(workflow.reserved),
             }
         )
 

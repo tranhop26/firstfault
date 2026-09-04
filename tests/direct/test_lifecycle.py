@@ -199,6 +199,9 @@ def test_unauthorized_lifecycle_calls_do_not_consume_their_nonces(
         workflow_id="wf-start",
         nonce="create-start",
     )
+    direct_vm.value = 51
+    contract.fund_workflow("wf-start", "fund-start")
+    direct_vm.value = 0
     direct_vm.sender = direct_bob
     with direct_vm.expect_revert("Orchestrator only"):
         contract.start_workflow("wf-start", "reuse-start")
@@ -266,7 +269,7 @@ def test_only_buyer_can_cancel_before_the_workflow_starts(
         contract.start_workflow("wf-1", "start-cancelled")
 
 
-def test_only_orchestrator_can_start_and_terminal_state_is_immutable(
+def test_only_orchestrator_can_start_a_funded_workflow_and_terminal_state_is_immutable(
     direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie, direct_accounts
 ):
     """Break caught: unauthorized starts, repeated starts, or post-cancellation mutation."""
@@ -274,6 +277,9 @@ def test_only_orchestrator_can_start_and_terminal_state_is_immutable(
     orchestrator, publisher = direct_accounts[:2]
     direct_vm.sender = direct_alice
     create_workflow(contract, orchestrator, direct_bob, direct_charlie, publisher)
+    direct_vm.value = 51
+    contract.fund_workflow("wf-1", "fund-before-start")
+    direct_vm.value = 0
 
     direct_vm.sender = direct_bob
     with direct_vm.expect_revert("Orchestrator only"):
