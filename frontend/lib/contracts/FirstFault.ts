@@ -5,6 +5,7 @@ import {
   ExecutionResult,
   TransactionStatus,
   type GenLayerTransaction,
+  type TransactionHash,
 } from "genlayer-js/types";
 import { hexToBytes, type Account, type Address } from "viem";
 
@@ -20,6 +21,9 @@ export type FirstFaultWorkflow = {
   reserved: string;
   state: string;
   workflow_id: string;
+  rejection_reason?: string;
+  unresolved_reason?: string;
+  dispute_opened_at?: string;
   verdict?: {
     outcome: string;
     first_breach_step: number;
@@ -37,7 +41,18 @@ export type FirstFaultStep = {
   workflow_id: string;
   output_hash?: string;
   evidence_hash?: string;
+  brief_hash?: string;
+  evidence_actor?: string;
+  observed_at?: string;
+  output_text?: string;
+  schema_version?: string;
+  source_url?: string;
+  submitted_at?: string;
+  upstream_hash?: string;
 };
+
+export type FirstFaultAccounting = Pick<FirstFaultWorkflow, "deposited" | "reserved" | "payout_scheduled" | "refund_scheduled" | "paid" | "refunded">;
+export type FirstFaultRecovery = { workflow_id: string; cure?: Record<string, unknown>; settlement?: Record<string, unknown> };
 
 export type CreateWorkflowInput = {
   workflowId: string;
@@ -149,6 +164,26 @@ export default class FirstFault {
     return this.write("start_workflow", [workflowId, nonce]);
   }
 
+  async acceptWorkflow(workflowId: string, nonce: string) {
+    return this.write("accept_workflow", [workflowId, nonce]);
+  }
+
+  async cancelWorkflow(workflowId: string, nonce: string) {
+    return this.write("cancel_workflow", [workflowId, nonce]);
+  }
+
+  async openDispute(workflowId: string, rejectionReason: string, nonce: string) {
+    return this.write("open_dispute", [workflowId, rejectionReason, nonce]);
+  }
+
+  async adjudicate(workflowId: string, nonce: string) {
+    return this.write("adjudicate", [workflowId, nonce]);
+  }
+
+  async timeoutToUnresolved(workflowId: string, nonce: string) {
+    return this.write("timeout_dispute_to_unresolved", [workflowId, nonce]);
+  }
+
   async submitStep(
     workflowId: string,
     stepIndex: number,
@@ -190,5 +225,24 @@ export default class FirstFault {
         args: [workflowId, stepIndex],
       }),
     );
+  }
+
+  async getAccounting(workflowId: string): Promise<FirstFaultAccounting> {
+    return parseContractJson<FirstFaultAccounting>(
+      await this.client.readContract({ address: this.contractAddress, functionName: "get_accounting", args: [workflowId] }),
+    );
+  }
+
+  async getRecovery(workflowId: string): Promise<FirstFaultRecovery> {
+    return parseContractJson<FirstFaultRecovery>(
+      await this.client.readContract({ address: this.contractAddress, functionName: "get_recovery", args: [workflowId] }),
+    );
+  }
+
+  async getTriggeredReceipts(receipt: GenLayerTransaction): Promise<GenLayerTransaction[]> {
+    const hash = (receipt.hash ?? receipt.txId) as TransactionHash | undefined;
+    if (!hash) return [];
+    const childIds = await this.client.getTriggeredTransactionIds({ hash });
+    return Promise.all(childIds.map((childHash) => this.client.getTransaction({ hash: childHash })));
   }
 }

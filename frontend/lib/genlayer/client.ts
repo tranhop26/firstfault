@@ -4,20 +4,16 @@ import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 import { createWalletClient, custom, type WalletClient } from "viem";
 
-// GenLayer Network Configuration (from environment variables with fallbacks)
-export const GENLAYER_CHAIN_ID = parseInt(process.env.NEXT_PUBLIC_GENLAYER_CHAIN_ID || "61999");
+// Studionet is the single source for chain metadata used by wallet and contract clients.
+export const GENLAYER_CHAIN_ID = studionet.id;
 export const GENLAYER_CHAIN_ID_HEX = `0x${GENLAYER_CHAIN_ID.toString(16).toUpperCase()}`;
 
 export const GENLAYER_NETWORK = {
   chainId: GENLAYER_CHAIN_ID_HEX,
-  chainName: process.env.NEXT_PUBLIC_GENLAYER_CHAIN_NAME || "GenLayer Studio",
-  nativeCurrency: {
-    name: process.env.NEXT_PUBLIC_GENLAYER_SYMBOL || "GEN",
-    symbol: process.env.NEXT_PUBLIC_GENLAYER_SYMBOL || "GEN",
-    decimals: 18,
-  },
-  rpcUrls: [process.env.NEXT_PUBLIC_GENLAYER_RPC_URL || "https://studio.genlayer.com/api"],
-  blockExplorerUrls: [],
+  chainName: studionet.name,
+  nativeCurrency: studionet.nativeCurrency,
+  rpcUrls: [...studionet.rpcUrls.default.http],
+  blockExplorerUrls: [studionet.blockExplorers.default.url],
 };
 
 // Ethereum provider type from window
