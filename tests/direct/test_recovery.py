@@ -1,11 +1,14 @@
 """Adversarial recovery tests for FirstFault's frozen V1 contract."""
 
 import json
+import re
 
 import pytest
 
 from tests.direct.conftest import to_hex
 from tests.direct.test_adjudication import (
+    PROMPT_PATTERN,
+    SOURCE_URL,
     evidence_hashes,
     install_decision_mocks,
     make_disputed,
@@ -22,6 +25,7 @@ from tests.direct.test_custody import (
 
 
 CURE_SOURCE = "https://example.test/cure-evidence"
+CURE_TEXT = "A fresh primary-source extract resolves the disputed support gap."
 
 
 @pytest.fixture
@@ -58,7 +62,7 @@ def unresolved(
 def submit_cure(contract, workflow_id="wf-recovery", nonce="cure-1", **overrides):
     """Submit literal cure evidence while allowing one field to exercise a guard."""
     values = {
-        "evidence_text": "A fresh primary-source extract resolves the disputed support gap.",
+        "evidence_text": CURE_TEXT,
         "source_url": CURE_SOURCE,
         "observed_at": EVIDENCE_NOW,
     }
@@ -176,6 +180,7 @@ def test_cure_reenters_adjudication_and_binds_the_appended_hash(
     all_hashes = evidence_hashes(contract, "wf-recovery") + [recovery["cure"]["cure_hash"]]
     direct_vm.clear_mocks()
     install_decision_mocks(direct_vm, verdict(all_hashes))
+    direct_vm.mock_web(re.escape(CURE_SOURCE), {"status": 200, "body": CURE_TEXT})
     direct_vm.sender = outsider
     contract.adjudicate("wf-recovery", "adjudicate-after-cure")
 
@@ -238,8 +243,8 @@ def test_only_a_workflow_party_can_propose_or_approve(
         contract.approve_mutual_settlement("wf-recovery", "retry-party-approve")
 
     direct_vm.sender = researcher
-    with direct_vm.expect_revert("Settlement proposal active"):
-        submit_cure(contract, nonce="cure-after-proposal")
+    submit_cure(contract, nonce="cure-after-proposal")
+    assert "settlement" not in json.loads(contract.get_recovery("wf-recovery"))
 
 
 def test_mutual_settlement_cannot_be_proposed_after_cure_reopens_adjudication(
@@ -252,6 +257,145 @@ def test_mutual_settlement_cannot_be_proposed_after_cure_reopens_adjudication(
     direct_vm.sender = buyer
     with direct_vm.expect_revert("Invalid state"):
         propose(contract, nonce="proposal-after-cure")
+
+
+def test_pending_proposal_does_not_block_one_cure_and_clears_stale_approvals(
+    unresolved, direct_vm
+):
+    """Break caught: one hostile proposal permanently locks the cure route."""
+    contract, buyer, _, researcher, _, _, _ = unresolved
+    direct_vm.sender = buyer
+    propose(contract)
+    contract.approve_mutual_settlement("wf-recovery", "proposal-approval-buyer")
+    direct_vm.sender = researcher
+    contract.approve_mutual_settlement("wf-recovery", "proposal-approval-researcher")
+
+    submit_cure(contract, nonce="cure-after-pending-proposal")
+
+    recovery = json.loads(contract.get_recovery("wf-recovery"))
+    assert "settlement" not in recovery
+    assert json.loads(contract.get_workflow("wf-recovery"))["state"] == "DISPUTED"
+
+
+def test_unanimously_approved_settlement_cannot_be_overwritten_by_cure(
+    unresolved, direct_vm
+):
+    """Break caught: a cure can race a fully approved terminal settlement."""
+    contract, buyer, _, researcher, writer, publisher, _ = unresolved
+    direct_vm.sender = buyer
+    propose(contract)
+    approve_all(contract, direct_vm, buyer, researcher, writer, publisher)
+    direct_vm.sender = researcher
+    with direct_vm.expect_revert("Settlement unanimously approved"):
+        submit_cure(contract, nonce="cure-after-unanimous")
+    assert json.loads(contract.get_workflow("wf-recovery"))["state"] == "UNRESOLVED"
+
+
+def test_cure_source_unavailable_keeps_unresolved_hold_without_transfer(
+    unresolved, direct_vm
+):
+    """Break caught: a worker assertion settles despite an unavailable cited source."""
+    contract, _, _, researcher, _, _, outsider = unresolved
+    direct_vm.sender = researcher
+    submit_cure(contract)
+    all_hashes = evidence_hashes(contract, "wf-recovery") + [
+        json.loads(contract.get_recovery("wf-recovery"))["cure"]["cure_hash"]
+    ]
+    install_decision_mocks(direct_vm, verdict(all_hashes))
+    direct_vm.mock_web(re.escape(CURE_SOURCE), {"status": 503, "body": "unavailable"})
+    scheduled = schedule_transfers(direct_vm)
+    direct_vm.sender = outsider
+    contract.adjudicate("wf-recovery", "cure-source-unavailable")
+
+    workflow = json.loads(contract.get_workflow("wf-recovery"))
+    assert workflow["state"] == "UNRESOLVED"
+    assert scheduled == []
+    assert accounting(contract, "wf-recovery")["reserved"] == "51"
+
+
+def test_cure_source_contradiction_keeps_unresolved_hold_without_transfer(
+    unresolved, direct_vm
+):
+    """Break caught: a source contradicting the cure assertion still authorizes payout."""
+    contract, _, _, researcher, _, _, outsider = unresolved
+    direct_vm.sender = researcher
+    submit_cure(contract)
+    all_hashes = evidence_hashes(contract, "wf-recovery") + [
+        json.loads(contract.get_recovery("wf-recovery"))["cure"]["cure_hash"]
+    ]
+    install_decision_mocks(direct_vm, verdict(all_hashes))
+    direct_vm.mock_web(
+        re.escape(CURE_SOURCE),
+        {"status": 200, "body": "The source says the opposite and rejects the claim."},
+    )
+    scheduled = schedule_transfers(direct_vm)
+    direct_vm.sender = outsider
+    contract.adjudicate("wf-recovery", "cure-source-contradiction")
+
+    workflow = json.loads(contract.get_workflow("wf-recovery"))
+    assert workflow["state"] == "UNRESOLVED"
+    assert scheduled == []
+    assert accounting(contract, "wf-recovery")["reserved"] == "51"
+
+
+def test_cured_prompt_requires_all_four_authoritative_hashes(unresolved):
+    """Break caught: the frozen prompt still asks a cured dispute for three citations."""
+    contract, *_ = unresolved
+    evidence = [
+        {"step_index": 0, "evidence_hash": "h-research"},
+        {"step_index": 1, "evidence_hash": "h-writer"},
+        {
+            "step_index": 2,
+            "evidence_hash": "h-publisher",
+            "cure": {"cure_hash": "h-cure"},
+        },
+    ]
+    prompt = contract._adjudication_prompt(
+        "rubric", "v1", "rejection", evidence, "research-render", "cure-render"
+    )
+    assert "exactly 4" in prompt
+    assert "h-cure" in prompt
+
+
+def test_timeout_unresolved_accepts_one_fresh_cure_as_new_evidence_anchor(
+    direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie, direct_accounts
+):
+    """Break caught: consensus-timeout UNRESOLVED can never be safely re-adjudicated."""
+    direct_vm.warp("2023-11-14T22:13:20+00:00")
+    contract = direct_deploy("contracts/firstfault.py")
+    orchestrator, publisher, outsider = direct_accounts[:3]
+    make_disputed(
+        contract,
+        direct_vm,
+        direct_alice,
+        orchestrator,
+        direct_bob,
+        direct_charlie,
+        publisher,
+        workflow_id="wf-timeout-cure",
+    )
+    warp_authoritative_transaction_time(direct_vm, "2023-11-14T23:13:21+00:00")
+    direct_vm.sender = outsider
+    contract.timeout_dispute_to_unresolved("wf-timeout-cure", "timeout-before-cure")
+
+    direct_vm.sender = direct_bob
+    contract.submit_cure(
+        "wf-timeout-cure",
+        CURE_TEXT,
+        CURE_SOURCE,
+        EVIDENCE_NOW + 3_601,
+        "timeout-cure",
+    )
+    recovery = json.loads(contract.get_recovery("wf-timeout-cure"))
+    all_hashes = evidence_hashes(contract, "wf-timeout-cure") + [
+        recovery["cure"]["cure_hash"]
+    ]
+    install_decision_mocks(direct_vm, verdict(all_hashes))
+    direct_vm.mock_web(re.escape(CURE_SOURCE), {"status": 200, "body": CURE_TEXT})
+    direct_vm.sender = outsider
+    contract.adjudicate("wf-timeout-cure", "timeout-cure-adjudicate")
+
+    assert json.loads(contract.get_workflow("wf-timeout-cure"))["state"] == "DECISION_PENDING_FINALITY"
 
 
 def test_replacement_binds_new_amounts_and_invalidates_every_prior_approval(

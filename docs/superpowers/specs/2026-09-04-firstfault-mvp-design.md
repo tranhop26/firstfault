@@ -24,13 +24,13 @@ GenLayer establishes one fact:
 
 The structured result is `ACCEPT_ALL`, `FIRST_BREACH`, or `UNRESOLVED`, plus the first-breach step, per-step status, concise reasons, and cited evidence hashes. Validators compare the semantic decision fields, not JSON shape or free-form wording.
 
-The adjudication uses `gl.vm.run_nondet` with a custom validator. `run_nondet_unsafe` is permitted only as a documented runtime fallback. Storage is read before the nondeterministic closure and captured as immutable input. One optional source URL per Research evidence may be rendered inside the nondeterministic block; unavailable, malformed, or low-confidence leader results become `UNRESOLVED`, never a favorable default. A validator disagreement terminates and rolls back that GenVM transaction, leaving the workflow `DISPUTED` with its hold unchanged. Only after the full 3,600-second evidence-expiry interval from the contract-derived `dispute_opened_at` *and* after every stored observation is strictly stale may anyone call `timeout_dispute_to_unresolved`; this deterministic, zero-transfer recovery transition cannot preempt a still-eligible adjudication and makes the stalled dispute eligible for the Task 6 cure or unanimous-settlement paths.
+The adjudication uses `gl.vm.run_nondet` with a custom validator. `run_nondet_unsafe` is permitted only as a documented runtime fallback. Storage is read before the nondeterministic closure and captured as immutable input. Research and any appended cure source are rendered inside the nondeterministic block; each rendered source is bounded, and an unavailable or contradictory cure source becomes `UNRESOLVED`, never a favorable default. A validator disagreement terminates and rolls back that GenVM transaction, leaving the workflow `DISPUTED` with its hold unchanged. Only after the full 3,600-second evidence-expiry interval from the contract-derived `dispute_opened_at` *and* after every stored observation is strictly stale may anyone call `timeout_dispute_to_unresolved`; this deterministic, zero-transfer recovery transition cannot preempt a still-eligible adjudication. A timeout-derived hold may use one fresh cure as a new evidence anchor while the immutable original observations remain historical rather than being relabelled fresh.
 
 ## On-chain consequence
 
 - `ACCEPT_ALL`: schedule each step's held GEN for its assigned worker.
 - `FIRST_BREACH`: schedule held GEN for compliant steps and refund the breached step's hold to the buyer.
-- `UNRESOLVED`: schedule no disputed transfer; preserve the hold for one cure attempt or unanimous on-chain mutual settlement.
+- `UNRESOLVED`: schedule no disputed transfer; preserve the hold for one source-verified cure attempt or unanimous on-chain mutual settlement.
 
 Amounts and recipients come only from deterministic contract storage. The LLM cannot create transfer instructions. Transfer messages are scheduled in the decision transaction and emitted under GenLayer finalization semantics; there is no separate application-level `settle()` method.
 
@@ -54,8 +54,8 @@ From review:
 
 Recovery branches:
 
-- `UNRESOLVED → CURE_SUBMITTED → ADJUDICATING`, once.
-- `UNRESOLVED → MUTUAL_PROPOSED → MUTUAL_APPROVED → SETTLED_MUTUAL`, requiring on-chain approval from every affected party.
+- `UNRESOLVED → CURE_SUBMITTED → ADJUDICATING`, once. A pending but not unanimously approved settlement is invalidated atomically when the cure is submitted; a unanimously approved settlement cannot be overwritten.
+- `UNRESOLVED → MUTUAL_PROPOSED → MUTUAL_APPROVED → SETTLED_MUTUAL`, requiring on-chain approval from every affected party. Proposals require exact citations to all stored evidence hashes, including the cure hash when present.
 - Cancellation is allowed only before any worker starts.
 - The buyer alone may accept or cancel their funded workflow; the orchestrator may start a funded workflow but cannot release buyer-held GEN.
 

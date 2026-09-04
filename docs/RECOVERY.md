@@ -10,11 +10,17 @@ that state alone never schedules a transfer.
 An unresolved workflow has two contract-governed recovery choices:
 
 1. **One cure.** A worker whose own stored step is marked `UNRESOLVED` may append
-   one fresh, canonical HTTPS-backed cure. The cure is bound to the original
-   evidence hash, actor, workflow, chain, contract, timestamps, schema, and
-   nonce. It never replaces the original step evidence and schedules no value.
-   The workflow returns to `DISPUTED` so the frozen semantic adjudication can
-   evaluate the original record plus the cure. No second cure is accepted.
+   one fresh, canonical HTTPS-backed cure. A pending proposal does not consume
+   this route: accepting the cure atomically invalidates that proposal and all
+   of its approvals. A unanimously approved proposal is the only exception;
+   once every role has approved it, a cure is rejected and the proposal can be
+   executed. The cure is bound to the original evidence hash, actor, workflow,
+   chain, contract, timestamps, schema, and nonce. It never replaces the
+   original step evidence and schedules no value. The workflow returns to
+   `DISPUTED` so semantic adjudication can evaluate the original record plus
+   the cure. The cure's HTTPS source is rendered and must contain the submitted
+   extract; unavailable, oversized, or contradictory source data remains
+   `UNRESOLVED`. No second cure is accepted.
 2. **Unanimous mutual settlement.** The buyer or any assigned worker may propose
    four allocations: Research, Writer, Publisher, and buyer refund. Their sum
    must equal the workflow's current `reserved` value exactly. The proposal hash
@@ -26,9 +32,12 @@ An unresolved workflow has two contract-governed recovery choices:
    `refund_scheduled` before child transfer messages are emitted; V1 never calls
    scheduled value `paid` or `refunded` without later authoritative proof.
 
-These are the only V1 recovery routes for existing holds. Nonces, actor checks,
-state checks, proposal versions, unanimous approvals, and terminal-state guards
-prevent replay, stale consent, double scheduling, and double claim.
+These are the only V1 recovery routes for existing holds. A timeout-derived
+`UNRESOLVED` may accept one fresh cure as a new evidence anchor; immutable old
+observations remain historical and are never relabelled as fresh. Nonces, actor
+checks, state checks, proposal versions, unanimous approvals, source
+verification, and terminal-state guards prevent replay, stale consent, double
+scheduling, and double claim.
 
 ## Faulty deployment runbook
 

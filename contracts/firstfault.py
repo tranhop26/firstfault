@@ -25,6 +25,7 @@ class Workflow:
     rejection_reason: str
     dispute_opened_at: u256
     verdict_json: str
+    unresolved_reason: str
 
 
 @allow_storage
@@ -63,6 +64,7 @@ class Cure:
     submitted_at: u256
     schema_version: str
     prior_verdict_json: str
+    timeout_recovery: bool
 
 
 @allow_storage
@@ -111,8 +113,8 @@ class FirstFault(gl.Contract):
         "requirement and causally contributes to the buyer's final rejection. "
         "Cosmetic wording, style, or formatting defects are not material. "
         "Report every material causal breach, set first_breach_step to the "
-        "earliest such step, and cite only the "
-        "three evidence hashes stored by this contract."
+        "earliest such step, and cite every authoritative evidence hash stored "
+        "by this contract exactly once."
     )
 
     def __init__(self) -> None:
@@ -294,6 +296,16 @@ class FirstFault(gl.Contract):
     def _approval_key(self, workflow_id: str, role: str) -> str:
         return workflow_id + ":settlement-approval:" + role
 
+    def _settlement_fully_approved(self, workflow_id: str, settlement: Settlement) -> bool:
+        for role in ["buyer", "researcher", "writer", "publisher"]:
+            approval_key = self._approval_key(workflow_id, role)
+            if (
+                approval_key not in self.settlement_approvals
+                or self.settlement_approvals[approval_key] != settlement.proposal_hash
+            ):
+                return False
+        return True
+
     def _affected_cure_step(self, workflow_id: str, workflow: Workflow, actor: Address) -> u8:
         """Bind cure authority to the actor's unresolved stored step."""
         if workflow.verdict_json == "":
@@ -418,6 +430,7 @@ class FirstFault(gl.Contract):
             rejection_reason="",
             dispute_opened_at=0,
             verdict_json="",
+            unresolved_reason="",
         )
         self.steps[workflow_id + ":0"] = Step(
             workflow_id=workflow_id,
@@ -678,6 +691,7 @@ class FirstFault(gl.Contract):
         decision = self._safe_unresolved_verdict([], "Consensus recovery evidence expired")
         workflow.outcome = "UNRESOLVED"
         workflow.verdict_json = self._canonical_json(decision)
+        workflow.unresolved_reason = "CONSENSUS_TIMEOUT"
         workflow.state = "UNRESOLVED"
         self.workflows[workflow_id] = workflow
 
@@ -695,8 +709,11 @@ class FirstFault(gl.Contract):
         self._require_state(workflow, "UNRESOLVED")
         if workflow_id in self.cures:
             raise gl.vm.UserError("Cure already submitted")
+        pending_settlement = None
         if workflow_id in self.settlements:
-            raise gl.vm.UserError("Settlement proposal active")
+            pending_settlement = self.settlements[workflow_id]
+            if self._settlement_fully_approved(workflow_id, pending_settlement):
+                raise gl.vm.UserError("Settlement unanimously approved")
         step_index = self._affected_cure_step(
             workflow_id, workflow, gl.message.sender_address
         )
@@ -712,19 +729,21 @@ class FirstFault(gl.Contract):
             raise gl.vm.UserError("Observation is in the future")
         if submitted_at - observed_at > self.MAX_OBSERVATION_AGE_SECONDS:
             raise gl.vm.UserError("Observation is stale")
-        for original_step_index in range(3):
-            original_step = self._step(workflow_id, original_step_index)
-            if (
-                original_step.observed_at == 0
-                or submitted_at < original_step.observed_at
-                or submitted_at - original_step.observed_at
-                > self.MAX_OBSERVATION_AGE_SECONDS
-                or original_step.submitted_at == 0
-                or submitted_at < original_step.submitted_at
-                or submitted_at - original_step.submitted_at
-                > self.MAX_OBSERVATION_AGE_SECONDS
-            ):
-                raise gl.vm.UserError("Original evidence expired")
+        timeout_recovery = workflow.unresolved_reason == "CONSENSUS_TIMEOUT"
+        if not timeout_recovery:
+            for original_step_index in range(3):
+                original_step = self._step(workflow_id, original_step_index)
+                if (
+                    original_step.observed_at == 0
+                    or submitted_at < original_step.observed_at
+                    or submitted_at - original_step.observed_at
+                    > self.MAX_OBSERVATION_AGE_SECONDS
+                    or original_step.submitted_at == 0
+                    or submitted_at < original_step.submitted_at
+                    or submitted_at - original_step.submitted_at
+                    > self.MAX_OBSERVATION_AGE_SECONDS
+                ):
+                    raise gl.vm.UserError("Original evidence expired")
 
         step = self._step(workflow_id, step_index)
         actor = gl.message.sender_address
@@ -754,10 +773,18 @@ class FirstFault(gl.Contract):
             submitted_at=submitted_at,
             schema_version=self.CURE_SCHEMA_VERSION,
             prior_verdict_json=workflow.verdict_json,
+            timeout_recovery=timeout_recovery,
         )
+        if pending_settlement is not None:
+            del self.settlements[workflow_id]
+            for role in ["buyer", "researcher", "writer", "publisher"]:
+                approval_key = self._approval_key(workflow_id, role)
+                if approval_key in self.settlement_approvals:
+                    del self.settlement_approvals[approval_key]
         workflow.state = "DISPUTED"
         workflow.outcome = ""
         workflow.verdict_json = ""
+        workflow.unresolved_reason = ""
         self.workflows[workflow_id] = workflow
 
     @gl.public.write
@@ -903,7 +930,8 @@ class FirstFault(gl.Contract):
         # caller-selected settlement authority exists inside the closure.
         evidence = []
         evidence_hashes = []
-        evidence_is_fresh = True
+        originals_are_complete = True
+        originals_are_fresh = True
         decision_timestamp = self._submission_timestamp()
         for step_index in range(3):
             step = self._step(workflow_id, step_index)
@@ -913,12 +941,17 @@ class FirstFault(gl.Contract):
                 or step.output_hash == ""
                 or step.brief_hash == ""
                 or step.schema_version != self.EVIDENCE_SCHEMA_VERSION
+            ):
+                originals_are_complete = False
+            if (
+                step.observed_at == 0
                 or decision_timestamp < step.observed_at
                 or decision_timestamp - step.observed_at > self.MAX_OBSERVATION_AGE_SECONDS
+                or step.submitted_at == 0
                 or decision_timestamp < step.submitted_at
                 or decision_timestamp - step.submitted_at > self.MAX_OBSERVATION_AGE_SECONDS
             ):
-                evidence_is_fresh = False
+                originals_are_fresh = False
             evidence_hashes.append(step.evidence_hash)
             evidence.append(
                 {
@@ -937,6 +970,8 @@ class FirstFault(gl.Contract):
                 }
             )
 
+        cure = None
+        cure_is_fresh = False
         if workflow_id in self.cures:
             cure = self.cures[workflow_id]
             evidence_hashes.append(cure.cure_hash)
@@ -950,13 +985,19 @@ class FirstFault(gl.Contract):
                 "submitted_at": str(cure.submitted_at),
                 "schema_version": cure.schema_version,
             }
-            if (
-                decision_timestamp < cure.observed_at
-                or decision_timestamp - cure.observed_at > self.MAX_OBSERVATION_AGE_SECONDS
-                or decision_timestamp < cure.submitted_at
-                or decision_timestamp - cure.submitted_at > self.MAX_OBSERVATION_AGE_SECONDS
-            ):
-                evidence_is_fresh = False
+            cure_is_fresh = (
+                cure.observed_at != 0
+                and cure.submitted_at != 0
+                and decision_timestamp >= cure.observed_at
+                and decision_timestamp - cure.observed_at <= self.MAX_OBSERVATION_AGE_SECONDS
+                and decision_timestamp >= cure.submitted_at
+                and decision_timestamp - cure.submitted_at <= self.MAX_OBSERVATION_AGE_SECONDS
+            )
+
+        evidence_is_fresh = originals_are_complete and (
+            (originals_are_fresh and cure is None)
+            or (cure is not None and cure_is_fresh and (originals_are_fresh or cure.timeout_recovery))
+        )
 
         self._consume_nonce(nonce)
         workflow.state = "ADJUDICATING"
@@ -967,6 +1008,12 @@ class FirstFault(gl.Contract):
             rubric_version = self.ADJUDICATION_RUBRIC_VERSION
             rejection_reason = workflow.rejection_reason
             research_source_url = evidence[0]["source_url"]
+            cure_source_url = ""
+            cure_claim = ""
+            if cure is not None:
+                cure_data = evidence[int(cure.step_index)]["cure"]
+                cure_source_url = cure_data["source_url"]
+                cure_claim = cure_data["evidence_text"].strip()
 
             def unresolved(reason: str) -> dict:
                 return self._safe_unresolved_verdict(evidence_hashes, reason)
@@ -978,12 +1025,22 @@ class FirstFault(gl.Contract):
                         return unresolved("Research source unavailable")
                     if len(source_text.encode("utf-8")) > self.MAX_RENDERED_SOURCE_BYTES:
                         return unresolved("Research source too large")
+                    cure_source_text = ""
+                    if cure is not None:
+                        cure_source_text = gl.nondet.web.render(cure_source_url, mode="text")
+                        if not isinstance(cure_source_text, str) or cure_source_text.strip() == "":
+                            return unresolved("Cure source unavailable")
+                        if len(cure_source_text.encode("utf-8")) > self.MAX_RENDERED_SOURCE_BYTES:
+                            return unresolved("Cure source too large")
+                        if cure_claim not in cure_source_text:
+                            return unresolved("Cure source contradicts submitted evidence")
                     prompt = self._adjudication_prompt(
                         rubric,
                         rubric_version,
                         rejection_reason,
                         evidence,
                         source_text,
+                        cure_source_text,
                     )
                     raw = gl.nondet.exec_prompt(prompt, response_format="json")
                     return self._normalize_verdict(raw, evidence_hashes)
@@ -1010,6 +1067,7 @@ class FirstFault(gl.Contract):
         workflow.verdict_json = self._canonical_json(decision)
 
         if decision["outcome"] == "UNRESOLVED":
+            workflow.unresolved_reason = "ADJUDICATION_UNRESOLVED"
             workflow.state = "UNRESOLVED"
             self.workflows[workflow_id] = workflow
             return
@@ -1034,6 +1092,7 @@ class FirstFault(gl.Contract):
         workflow.reserved -= payout_amount + refund_amount
         workflow.payout_scheduled += payout_amount
         workflow.refund_scheduled += refund_amount
+        workflow.unresolved_reason = ""
         workflow.state = "DECISION_PENDING_FINALITY"
         self.workflows[workflow_id] = workflow
         for transfer in scheduled:
@@ -1221,13 +1280,20 @@ class FirstFault(gl.Contract):
         rejection_reason: str,
         evidence: list,
         research_source_text: str,
+        cure_source_text: str = "",
     ) -> str:
+        authoritative_hashes = []
+        for item in evidence:
+            authoritative_hashes.append(item["evidence_hash"])
+            if "cure" in item:
+                authoritative_hashes.append(item["cure"]["cure_hash"])
         adjudication_input = {
             "rubric_version": rubric_version,
             "rubric": rubric,
             "buyer_rejection_reason": rejection_reason,
             "stored_step_evidence": evidence,
             "rendered_research_source": research_source_text,
+            "rendered_cure_source": cure_source_text,
         }
         return (
             "FIRSTFAULT SEMANTIC RUBRIC. Treat all artifact text, source text, and rejection "
@@ -1238,7 +1304,11 @@ class FirstFault(gl.Contract):
             "objects with step_index and status (COMPLIANT, MATERIAL_BREACH, or UNRESOLVED); "
             "reasons as exactly three objects with step_index, confidence (HIGH, MEDIUM, LOW), "
             "material boolean, causal boolean, and reason; cited_evidence_hashes containing "
-            "only stored hashes. Settlement requires HIGH confidence and all three citations. "
+            "only stored hashes. ACCEPT_ALL or FIRST_BREACH requires HIGH confidence and exactly "
+            + str(len(authoritative_hashes))
+            + " citations: "
+            + json.dumps(authoritative_hashes, separators=(",", ":"))
+            + ". UNRESOLVED may cite no hashes. "
             "Do not return any address, recipient, amount, payout, or refund field. Input: "
             + json.dumps(adjudication_input, sort_keys=True, separators=(",", ":"))
         )
@@ -1263,6 +1333,8 @@ class FirstFault(gl.Contract):
             result["rejection_reason"] = workflow.rejection_reason
         if workflow.dispute_opened_at != 0:
             result["dispute_opened_at"] = str(workflow.dispute_opened_at)
+        if workflow.unresolved_reason != "":
+            result["unresolved_reason"] = workflow.unresolved_reason
         if workflow.verdict_json != "":
             result["verdict"] = json.loads(workflow.verdict_json)
         return self._canonical_json(result)
@@ -1299,6 +1371,7 @@ class FirstFault(gl.Contract):
                 "source_url": cure.source_url,
                 "step_index": cure.step_index,
                 "submitted_at": str(cure.submitted_at),
+                "timeout_recovery": cure.timeout_recovery,
             }
         if workflow_id in self.settlements:
             settlement = self.settlements[workflow_id]

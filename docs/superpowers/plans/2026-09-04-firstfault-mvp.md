@@ -23,7 +23,7 @@
 - The validator compares `outcome`, `first_breach_step`, and per-step semantic statuses, not JSON shape or free-form reason text.
 - Payout/refund recipients and amounts come only from deterministic storage. The LLM never supplies transfer instructions.
 - Decision methods schedule external transfers; there is no application-level `settle()` method.
-- Missing, stale, unavailable, malformed, contradictory, or insufficient leader evidence cannot cause payout or refund; it yields `REQUEST_MORE_INFO` or `UNRESOLVED`. A validator disagreement is a GenVM transaction rollback, so the contract remains `DISPUTED` with its hold unchanged; only after the full 3,600-second evidence-expiry window from `dispute_opened_at` and every stored observation is strictly stale may `timeout_dispute_to_unresolved` deterministically expose the safe recovery state without any transfer.
+- Missing, stale, unavailable, malformed, contradictory, or insufficient leader evidence cannot cause payout or refund; it yields `REQUEST_MORE_INFO` or `UNRESOLVED`. Research and appended cure sources are rendered and bounded inside the nondeterministic closure; an unavailable or contradictory cure source remains `UNRESOLVED`. A validator disagreement is a GenVM transaction rollback, so the contract remains `DISPUTED` with its hold unchanged; only after the full 3,600-second evidence-expiry window from `dispute_opened_at` and every stored observation is strictly stale may `timeout_dispute_to_unresolved` deterministically expose the safe recovery state without any transfer. A timeout-derived `UNRESOLVED` may use one fresh cure as a new evidence anchor without rewriting the old observations.
 - Frontend state never advances beyond contract state and must distinguish disconnected, approval, submitted, pending/accepted, finalized, triggered-transfer pending, success, error, unresolved, and readback.
 - Never place a private key, token, or secret in source, logs, commits, README, or any `NEXT_PUBLIC_*` variable.
 - Before GitHub push, contract deployment, or Vercel deployment, stop for action-time confirmation of the exact GitHub account/repository, deployment wallet, and Vercel team/project.
@@ -304,7 +304,7 @@ firstfault/
 
 - [ ] **Step 3: Implement one cure and unanimous settlement**
 
-  Cure returns the workflow to adjudication once. Mutual settlement amounts must sum exactly to reserved value; buyer and all three workers approve the exact proposal version on-chain before execution schedules transfers.
+  Cure returns the workflow to adjudication once. A pending, not-yet-unanimous settlement cannot block the cure and is atomically invalidated with its approvals; a unanimously approved proposal cannot be overwritten. Cure source content must be rendered and contain the submitted extract. Timeout-derived `UNRESOLVED` accepts one fresh cure while preserving stale originals as historical evidence. Mutual settlement amounts must sum exactly to reserved value; buyer and all three workers approve the exact proposal version on-chain before execution schedules transfers, and adjudication settlement requires exactly all authoritative evidence hashes (three originals plus a cure when present).
 
 - [ ] **Step 4: Document frozen recovery**
 
