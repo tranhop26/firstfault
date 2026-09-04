@@ -114,6 +114,78 @@ class FirstFault(gl.Contract):
             raise gl.vm.UserError("Invalid runtime timestamp")
         return u256(int(parsed.timestamp()))
 
+    def _canonical_research_source(self, source_url: str) -> str:
+        """Accept only a stable, credential-free absolute HTTPS source URL."""
+        from ipaddress import IPv4Address, IPv6Address
+        from urllib.parse import urlsplit, urlunsplit
+
+        if source_url == "":
+            raise gl.vm.UserError("Research source required")
+        if any(ord(character) < 33 or ord(character) > 126 or character == "\\" for character in source_url):
+            raise gl.vm.UserError("Invalid research source URL")
+
+        def canonical_component(value: str) -> str:
+            result = ""
+            index = 0
+            while index < len(value):
+                if value[index] != "%":
+                    result += value[index]
+                    index += 1
+                    continue
+                if index + 2 >= len(value):
+                    raise gl.vm.UserError("Invalid research source URL")
+                escape = value[index + 1 : index + 3]
+                if any(character not in "0123456789abcdefABCDEF" for character in escape):
+                    raise gl.vm.UserError("Invalid research source URL")
+                result += "%" + escape.upper()
+                index += 3
+            return result
+
+        try:
+            source = urlsplit(source_url)
+            port = source.port
+        except ValueError:
+            raise gl.vm.UserError("Invalid research source URL")
+        if (
+            source.scheme.lower() != "https"
+            or source.hostname is None
+            or source.username is not None
+            or source.password is not None
+            or source.fragment != ""
+            or port == 0
+        ):
+            raise gl.vm.UserError("Invalid research source URL")
+
+        host = source.hostname.lower()
+        if ":" in host:
+            try:
+                host = "[" + IPv6Address(host).compressed + "]"
+            except ValueError:
+                raise gl.vm.UserError("Invalid research source URL")
+        elif all(character in "0123456789." for character in host):
+            try:
+                host = str(IPv4Address(host))
+            except ValueError:
+                raise gl.vm.UserError("Invalid research source URL")
+        else:
+            labels = host.split(".")
+            if len(host) > 253 or any(
+                len(label) == 0
+                or len(label) > 63
+                or not label[0].isalnum()
+                or not label[-1].isalnum()
+                or any(not character.isalnum() and character != "-" for character in label)
+                for label in labels
+            ):
+                raise gl.vm.UserError("Invalid research source URL")
+
+        authority = host
+        if port is not None and port != 443:
+            authority += ":" + str(port)
+        path = canonical_component(source.path or "/")
+        query = canonical_component(source.query)
+        return urlunsplit(("https", authority, path, query, ""))
+
     def _canonical_evidence(
         self,
         workflow_id: str,
@@ -288,8 +360,7 @@ class FirstFault(gl.Contract):
         if step_index == 0:
             if upstream_hash != "":
                 raise gl.vm.UserError("Research upstream hash must be empty")
-            if source_url == "":
-                raise gl.vm.UserError("Research source required")
+            source_url = self._canonical_research_source(source_url)
         else:
             upstream = self._step(workflow_id, step_index - 1)
             if upstream.state != "SUBMITTED":
@@ -386,7 +457,7 @@ class FirstFault(gl.Contract):
     def accept_workflow(self, workflow_id: str, nonce: str) -> None:
         workflow = self._workflow(workflow_id)
         self._require_sender(workflow.buyer, "Buyer only")
-        self._require_state(workflow, "IN_PROGRESS")
+        self._require_state(workflow, "READY_FOR_REVIEW")
         if workflow.reserved == 0:
             raise gl.vm.UserError("Reserved funds required")
         self._consume_nonce(nonce)

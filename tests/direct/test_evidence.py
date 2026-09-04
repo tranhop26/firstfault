@@ -260,6 +260,51 @@ def test_research_requires_source_and_rejected_nonce_remains_usable(
     submit(contract, "wf-evidence", 0, RESEARCH_OUTPUT, "", SOURCE, NOW, "retry-source")
 
 
+@pytest.mark.parametrize(
+    "invalid_source",
+    [
+        "not-a-url",
+        "http://example.test/primary-source",
+        " https://example.test/primary-source",
+        "https://user:password@example.test/primary-source",
+        "https://example.test/primary-source#fragment",
+        "https://%zz/primary-source",
+        "https://example..test/primary-source",
+        "https://-example.test/primary-source",
+        "https://example.test/%zz",
+    ],
+)
+def test_research_rejects_noncanonical_https_source_before_consuming_nonce(
+    started_workflow, direct_vm, direct_bob, invalid_source
+):
+    """Break caught: non-HTTPS, malformed, whitespace, credentialed, or fragment-bearing provenance burns a worker nonce."""
+    contract, _, _ = started_workflow
+    direct_vm.sender = direct_bob
+    with direct_vm.expect_revert("Invalid research source URL"):
+        submit(contract, "wf-evidence", 0, RESEARCH_OUTPUT, "", invalid_source, NOW, "retry-canonical-source")
+    submit(contract, "wf-evidence", 0, RESEARCH_OUTPUT, "", SOURCE, NOW, "retry-canonical-source")
+    assert json.loads(contract.get_step("wf-evidence", 0))["source_url"] == SOURCE
+
+
+def test_research_stores_a_canonical_absolute_https_source_url(started_workflow, direct_vm, direct_bob):
+    """Break caught: storing an unnormalized authority or default HTTPS port as stable provenance."""
+    contract, _, _ = started_workflow
+    direct_vm.sender = direct_bob
+    submit(
+        contract,
+        "wf-evidence",
+        0,
+        RESEARCH_OUTPUT,
+        "",
+        "HTTPS://EXAMPLE.TEST:443/primary-source?revision=1",
+        NOW,
+        "canonical-source",
+    )
+    assert json.loads(contract.get_step("wf-evidence", 0))["source_url"] == (
+        "https://example.test/primary-source?revision=1"
+    )
+
+
 def test_rejects_oversized_output_and_unknown_workflow(
     started_workflow, direct_vm, direct_bob
 ):
