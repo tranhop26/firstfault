@@ -49,15 +49,50 @@ class Step:
     schema_version: str
 
 
+@allow_storage
+@dataclass
+class Cure:
+    workflow_id: str
+    step_index: u8
+    actor: Address
+    original_evidence_hash: str
+    evidence_text: str
+    cure_hash: str
+    source_url: str
+    observed_at: u256
+    submitted_at: u256
+    schema_version: str
+    prior_verdict_json: str
+
+
+@allow_storage
+@dataclass
+class Settlement:
+    workflow_id: str
+    version: u256
+    proposal_hash: str
+    proposer: Address
+    research_amount: bigint
+    writer_amount: bigint
+    publisher_amount: bigint
+    buyer_refund: bigint
+
+
 class FirstFault(gl.Contract):
     """The intentionally frozen source of truth for workflow lifecycle state."""
 
     workflows: TreeMap[str, Workflow]
     steps: TreeMap[str, Step]
+    cures: TreeMap[str, Cure]
+    settlements: TreeMap[str, Settlement]
+    settlement_approvals: TreeMap[str, str]
     used_nonces: TreeMap[str, u8]
 
     EVIDENCE_SCHEMA_VERSION = "firstfault-evidence-v1"
+    CURE_SCHEMA_VERSION = "firstfault-cure-v1"
+    SETTLEMENT_SCHEMA_VERSION = "firstfault-mutual-settlement-v1"
     MAX_OUTPUT_BYTES = 16_384
+    MAX_CURE_BYTES = 16_384
     MAX_SOURCE_URL_BYTES = 2_048
     MAX_OBSERVATION_AGE_SECONDS = 3_600
     MAX_REJECTION_REASON_BYTES = 2_048
@@ -241,6 +276,99 @@ class FirstFault(gl.Contract):
             ],
             ensure_ascii=False,
             separators=(",", ":"),
+        )
+
+    def _workflow_party_roles(self, workflow_id: str, workflow: Workflow, actor: Address) -> list:
+        """Return every settlement role controlled by the calling identity."""
+        roles = []
+        if actor == workflow.buyer:
+            roles.append("buyer")
+        worker_roles = ["researcher", "writer", "publisher"]
+        for step_index in range(3):
+            if actor == self._step(workflow_id, step_index).worker:
+                roles.append(worker_roles[step_index])
+        if roles == []:
+            raise gl.vm.UserError("Workflow party only")
+        return roles
+
+    def _approval_key(self, workflow_id: str, role: str) -> str:
+        return workflow_id + ":settlement-approval:" + role
+
+    def _affected_cure_step(self, workflow_id: str, workflow: Workflow, actor: Address) -> u8:
+        """Bind cure authority to the actor's unresolved stored step."""
+        if workflow.verdict_json == "":
+            raise gl.vm.UserError("Affected worker only")
+        try:
+            verdict = json.loads(workflow.verdict_json)
+            statuses = verdict["step_statuses"]
+            for item in statuses:
+                step_index = item["step_index"]
+                if (
+                    item["status"] == "UNRESOLVED"
+                    and actor == self._step(workflow_id, step_index).worker
+                ):
+                    return u8(step_index)
+        except (TypeError, ValueError, KeyError):
+            pass
+        raise gl.vm.UserError("Affected worker only")
+
+    def _canonical_cure(
+        self,
+        workflow_id: str,
+        step_index: u8,
+        actor: Address,
+        original_evidence_hash: str,
+        evidence_text: str,
+        source_url: str,
+        observed_at: u256,
+        submitted_at: u256,
+        nonce: str,
+    ) -> str:
+        return json.dumps(
+            [
+                str(gl.message.chain_id),
+                gl.message.contract_address.as_hex,
+                workflow_id,
+                str(step_index),
+                actor.as_hex,
+                original_evidence_hash,
+                self._sha256_hex(evidence_text),
+                source_url,
+                str(observed_at),
+                str(submitted_at),
+                self.CURE_SCHEMA_VERSION,
+                nonce,
+            ],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+
+    def _settlement_hash(
+        self,
+        workflow_id: str,
+        version: u256,
+        reserved: bigint,
+        research_amount: bigint,
+        writer_amount: bigint,
+        publisher_amount: bigint,
+        buyer_refund: bigint,
+    ) -> str:
+        return self._sha256_hex(
+            json.dumps(
+                [
+                    str(gl.message.chain_id),
+                    gl.message.contract_address.as_hex,
+                    workflow_id,
+                    str(version),
+                    str(reserved),
+                    str(research_amount),
+                    str(writer_amount),
+                    str(publisher_amount),
+                    str(buyer_refund),
+                    self.SETTLEMENT_SCHEMA_VERSION,
+                ],
+                separators=(",", ":"),
+            )
         )
 
     @gl.public.write
@@ -494,9 +622,14 @@ class FirstFault(gl.Contract):
         self.workflows[workflow_id] = workflow
         for step_index in range(3):
             step = self._step(workflow_id, step_index)
-            step.state = "PAYOUT_SCHEDULED"
+            step.state = (
+                "PAYOUT_SCHEDULED"
+                if step.amount > 0
+                else "NO_PAYOUT"
+            )
             self.steps[workflow_id + ":" + str(step_index)] = step
-            gl.get_contract_at(step.worker).emit_transfer(value=u256(step.amount))
+            if step.amount > 0:
+                gl.get_contract_at(step.worker).emit_transfer(value=u256(step.amount))
 
     @gl.public.write
     def open_dispute(self, workflow_id: str, rejection_reason: str, nonce: str) -> None:
@@ -549,6 +682,215 @@ class FirstFault(gl.Contract):
         self.workflows[workflow_id] = workflow
 
     @gl.public.write
+    def submit_cure(
+        self,
+        workflow_id: str,
+        evidence_text: str,
+        source_url: str,
+        observed_at: u256,
+        nonce: str,
+    ) -> None:
+        """Append one affected worker's fresh cure without rewriting prior evidence."""
+        workflow = self._workflow(workflow_id)
+        self._require_state(workflow, "UNRESOLVED")
+        if workflow_id in self.cures:
+            raise gl.vm.UserError("Cure already submitted")
+        if workflow_id in self.settlements:
+            raise gl.vm.UserError("Settlement proposal active")
+        step_index = self._affected_cure_step(
+            workflow_id, workflow, gl.message.sender_address
+        )
+        if evidence_text.strip() == "":
+            raise gl.vm.UserError("Cure evidence required")
+        if len(evidence_text.encode("utf-8")) > self.MAX_CURE_BYTES:
+            raise gl.vm.UserError("Cure evidence too large")
+        if len(source_url.encode("utf-8")) > self.MAX_SOURCE_URL_BYTES:
+            raise gl.vm.UserError("Source URL too large")
+        source_url = self._canonical_research_source(source_url)
+        submitted_at = self._submission_timestamp()
+        if observed_at > submitted_at:
+            raise gl.vm.UserError("Observation is in the future")
+        if submitted_at - observed_at > self.MAX_OBSERVATION_AGE_SECONDS:
+            raise gl.vm.UserError("Observation is stale")
+        for original_step_index in range(3):
+            original_step = self._step(workflow_id, original_step_index)
+            if (
+                original_step.observed_at == 0
+                or submitted_at < original_step.observed_at
+                or submitted_at - original_step.observed_at
+                > self.MAX_OBSERVATION_AGE_SECONDS
+                or original_step.submitted_at == 0
+                or submitted_at < original_step.submitted_at
+                or submitted_at - original_step.submitted_at
+                > self.MAX_OBSERVATION_AGE_SECONDS
+            ):
+                raise gl.vm.UserError("Original evidence expired")
+
+        step = self._step(workflow_id, step_index)
+        actor = gl.message.sender_address
+        cure_hash = self._sha256_hex(
+            self._canonical_cure(
+                workflow_id,
+                step_index,
+                actor,
+                step.evidence_hash,
+                evidence_text,
+                source_url,
+                observed_at,
+                submitted_at,
+                nonce,
+            )
+        )
+        self._consume_nonce(nonce)
+        self.cures[workflow_id] = Cure(
+            workflow_id=workflow_id,
+            step_index=step_index,
+            actor=actor,
+            original_evidence_hash=step.evidence_hash,
+            evidence_text=evidence_text,
+            cure_hash=cure_hash,
+            source_url=source_url,
+            observed_at=observed_at,
+            submitted_at=submitted_at,
+            schema_version=self.CURE_SCHEMA_VERSION,
+            prior_verdict_json=workflow.verdict_json,
+        )
+        workflow.state = "DISPUTED"
+        workflow.outcome = ""
+        workflow.verdict_json = ""
+        self.workflows[workflow_id] = workflow
+
+    @gl.public.write
+    def propose_mutual_settlement(
+        self,
+        workflow_id: str,
+        research_amount: u256,
+        writer_amount: u256,
+        publisher_amount: u256,
+        buyer_refund: u256,
+        nonce: str,
+    ) -> None:
+        """Bind an exact reserved-value allocation to a replaceable version."""
+        workflow = self._workflow(workflow_id)
+        self._require_state(workflow, "UNRESOLVED")
+        self._workflow_party_roles(workflow_id, workflow, gl.message.sender_address)
+        research = bigint(research_amount)
+        writer = bigint(writer_amount)
+        publisher = bigint(publisher_amount)
+        refund = bigint(buyer_refund)
+        if research + writer + publisher + refund != workflow.reserved:
+            raise gl.vm.UserError("Allocation must equal reserved value")
+        version = u256(1)
+        if workflow_id in self.settlements:
+            version = u256(self.settlements[workflow_id].version + 1)
+        proposal_hash = self._settlement_hash(
+            workflow_id,
+            version,
+            workflow.reserved,
+            research,
+            writer,
+            publisher,
+            refund,
+        )
+        self._consume_nonce(nonce)
+        self.settlements[workflow_id] = Settlement(
+            workflow_id=workflow_id,
+            version=version,
+            proposal_hash=proposal_hash,
+            proposer=gl.message.sender_address,
+            research_amount=research,
+            writer_amount=writer,
+            publisher_amount=publisher,
+            buyer_refund=refund,
+        )
+
+    @gl.public.write
+    def approve_mutual_settlement(self, workflow_id: str, nonce: str) -> None:
+        """Approve only the currently stored proposal version for one party role."""
+        workflow = self._workflow(workflow_id)
+        self._require_state(workflow, "UNRESOLVED")
+        if workflow_id not in self.settlements:
+            raise gl.vm.UserError("Settlement proposal required")
+        roles = self._workflow_party_roles(
+            workflow_id, workflow, gl.message.sender_address
+        )
+        settlement = self.settlements[workflow_id]
+        already_approved = True
+        for role in roles:
+            approval_key = self._approval_key(workflow_id, role)
+            if (
+                approval_key not in self.settlement_approvals
+                or self.settlement_approvals[approval_key] != settlement.proposal_hash
+            ):
+                already_approved = False
+        if already_approved:
+            raise gl.vm.UserError("Proposal already approved")
+        self._consume_nonce(nonce)
+        for role in roles:
+            self.settlement_approvals[
+                self._approval_key(workflow_id, role)
+            ] = settlement.proposal_hash
+
+    @gl.public.write
+    def execute_mutual_settlement(self, workflow_id: str, nonce: str) -> None:
+        """Permissionlessly schedule one unanimously approved exact allocation."""
+        workflow = self._workflow(workflow_id)
+        self._require_state(workflow, "UNRESOLVED")
+        if workflow_id not in self.settlements:
+            raise gl.vm.UserError("Settlement proposal required")
+        settlement = self.settlements[workflow_id]
+        for role in ["buyer", "researcher", "writer", "publisher"]:
+            approval_key = self._approval_key(workflow_id, role)
+            if (
+                approval_key not in self.settlement_approvals
+                or self.settlement_approvals[approval_key] != settlement.proposal_hash
+            ):
+                raise gl.vm.UserError("Unanimous approval required")
+        if (
+            settlement.research_amount
+            + settlement.writer_amount
+            + settlement.publisher_amount
+            + settlement.buyer_refund
+            != workflow.reserved
+        ):
+            raise gl.vm.UserError("Allocation must equal reserved value")
+
+        self._consume_nonce(nonce)
+        payout_amount = (
+            settlement.research_amount
+            + settlement.writer_amount
+            + settlement.publisher_amount
+        )
+        workflow.reserved = 0
+        workflow.payout_scheduled += payout_amount
+        workflow.refund_scheduled += settlement.buyer_refund
+        workflow.outcome = "MUTUAL_SETTLEMENT"
+        workflow.state = "SETTLEMENT_PENDING_FINALITY"
+        self.workflows[workflow_id] = workflow
+
+        worker_amounts = [
+            settlement.research_amount,
+            settlement.writer_amount,
+            settlement.publisher_amount,
+        ]
+        for step_index in range(3):
+            step = self._step(workflow_id, step_index)
+            step.state = (
+                "PAYOUT_SCHEDULED"
+                if worker_amounts[step_index] > 0
+                else "NO_PAYOUT"
+            )
+            self.steps[workflow_id + ":" + str(step_index)] = step
+            if worker_amounts[step_index] > 0:
+                gl.get_contract_at(step.worker).emit_transfer(
+                    value=u256(worker_amounts[step_index])
+                )
+        if settlement.buyer_refund > 0:
+            gl.get_contract_at(workflow.buyer).emit_transfer(
+                value=u256(settlement.buyer_refund)
+            )
+
+    @gl.public.write
     def adjudicate(self, workflow_id: str, nonce: str) -> None:
         """Establish and schedule the first material breach from stored evidence."""
         workflow = self._workflow(workflow_id)
@@ -594,6 +936,27 @@ class FirstFault(gl.Contract):
                     "schema_version": step.schema_version,
                 }
             )
+
+        if workflow_id in self.cures:
+            cure = self.cures[workflow_id]
+            evidence_hashes.append(cure.cure_hash)
+            evidence[int(cure.step_index)]["cure"] = {
+                "actor": cure.actor.as_hex,
+                "original_evidence_hash": cure.original_evidence_hash,
+                "evidence_text": cure.evidence_text,
+                "cure_hash": cure.cure_hash,
+                "source_url": cure.source_url,
+                "observed_at": str(cure.observed_at),
+                "submitted_at": str(cure.submitted_at),
+                "schema_version": cure.schema_version,
+            }
+            if (
+                decision_timestamp < cure.observed_at
+                or decision_timestamp - cure.observed_at > self.MAX_OBSERVATION_AGE_SECONDS
+                or decision_timestamp < cure.submitted_at
+                or decision_timestamp - cure.submitted_at > self.MAX_OBSERVATION_AGE_SECONDS
+            ):
+                evidence_is_fresh = False
 
         self._consume_nonce(nonce)
         workflow.state = "ADJUDICATING"
@@ -917,6 +1280,47 @@ class FirstFault(gl.Contract):
                 "reserved": str(workflow.reserved),
             }
         )
+
+    @gl.public.view
+    def get_recovery(self, workflow_id: str) -> str:
+        """Read append-only cure data and the exact current settlement version."""
+        workflow = self._workflow(workflow_id)
+        result = {"workflow_id": workflow_id}
+        if workflow_id in self.cures:
+            cure = self.cures[workflow_id]
+            result["cure"] = {
+                "actor": cure.actor.as_hex,
+                "cure_hash": cure.cure_hash,
+                "evidence_text": cure.evidence_text,
+                "observed_at": str(cure.observed_at),
+                "original_evidence_hash": cure.original_evidence_hash,
+                "prior_verdict": json.loads(cure.prior_verdict_json),
+                "schema_version": cure.schema_version,
+                "source_url": cure.source_url,
+                "step_index": cure.step_index,
+                "submitted_at": str(cure.submitted_at),
+            }
+        if workflow_id in self.settlements:
+            settlement = self.settlements[workflow_id]
+            approvals = {}
+            for role in ["buyer", "researcher", "writer", "publisher"]:
+                approval_key = self._approval_key(workflow_id, role)
+                approvals[role] = (
+                    approval_key in self.settlement_approvals
+                    and self.settlement_approvals[approval_key] == settlement.proposal_hash
+                )
+            result["settlement"] = {
+                "approvals": approvals,
+                "buyer_refund": str(settlement.buyer_refund),
+                "proposal_hash": settlement.proposal_hash,
+                "proposer": settlement.proposer.as_hex,
+                "publisher_amount": str(settlement.publisher_amount),
+                "research_amount": str(settlement.research_amount),
+                "schema_version": self.SETTLEMENT_SCHEMA_VERSION,
+                "version": str(settlement.version),
+                "writer_amount": str(settlement.writer_amount),
+            }
+        return self._canonical_json(result)
 
     @gl.public.view
     def get_step(self, workflow_id: str, step_index: u8) -> str:
