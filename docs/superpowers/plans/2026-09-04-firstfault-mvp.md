@@ -23,7 +23,7 @@
 - The validator compares `outcome`, `first_breach_step`, and per-step semantic statuses, not JSON shape or free-form reason text.
 - Payout/refund recipients and amounts come only from deterministic storage. The LLM never supplies transfer instructions.
 - Decision methods schedule external transfers; there is no application-level `settle()` method.
-- Missing, stale, unavailable, malformed, contradictory, or insufficient leader evidence cannot cause payout or refund; it yields `REQUEST_MORE_INFO` or `UNRESOLVED`. A validator disagreement is a GenVM transaction rollback, so the contract remains `DISPUTED` with its hold unchanged; after the frozen dispute timeout, `timeout_dispute_to_unresolved` deterministically exposes the safe recovery state without any transfer.
+- Missing, stale, unavailable, malformed, contradictory, or insufficient leader evidence cannot cause payout or refund; it yields `REQUEST_MORE_INFO` or `UNRESOLVED`. A validator disagreement is a GenVM transaction rollback, so the contract remains `DISPUTED` with its hold unchanged; only after the full 3,600-second evidence-expiry window from `dispute_opened_at` and every stored observation is strictly stale may `timeout_dispute_to_unresolved` deterministically expose the safe recovery state without any transfer.
 - Frontend state never advances beyond contract state and must distinguish disconnected, approval, submitted, pending/accepted, finalized, triggered-transfer pending, success, error, unresolved, and readback.
 - Never place a private key, token, or secret in source, logs, commits, README, or any `NEXT_PUBLIC_*` variable.
 - Before GitHub push, contract deployment, or Vercel deployment, stop for action-time confirmation of the exact GitHub account/repository, deployment wallet, and Vercel team/project.
@@ -248,7 +248,7 @@ firstfault/
 **Interfaces:**
 - `open_dispute(workflow_id: str, rejection_reason: str, nonce: str) -> None`
 - `adjudicate(workflow_id: str, nonce: str) -> None`
-- `timeout_dispute_to_unresolved(workflow_id: str, nonce: str) -> None` is permissionless after the frozen delay from contract-derived `dispute_opened_at`.
+- `timeout_dispute_to_unresolved(workflow_id: str, nonce: str) -> None` is permissionless only after `MAX_OBSERVATION_AGE_SECONDS` from contract-derived `dispute_opened_at` and after all three stored observations are strictly stale at authoritative runtime time.
 - Verdict JSON fields: `outcome`, `first_breach_step`, `step_statuses`, `reasons`, `cited_evidence_hashes`.
 
 - [ ] **Step 1: Write nondeterministic behavior tests first**
@@ -269,7 +269,7 @@ firstfault/
 
 - [ ] **Step 5: Validate results deterministically**
 
-  Reject unknown outcomes, invalid/duplicate step indexes, missing citations, `FIRST_BREACH` without one breached step, contradictory statuses, and any model-generated address or amount. Source failure or low confidence stores `UNRESOLVED` and schedules no transfer. A semantic validator disagreement rolls back the nondeterministic transaction, preserving `DISPUTED`, nonce, and holds; the separately deterministic timeout transition reaches `UNRESOLVED` only after its frozen delay.
+  Reject unknown outcomes, invalid/duplicate step indexes, missing citations, `FIRST_BREACH` without one breached step, contradictory statuses, and any model-generated address or amount. Source failure or low confidence stores `UNRESOLVED` and schedules no transfer. A semantic validator disagreement rolls back the nondeterministic transaction, preserving `DISPUTED`, nonce, and holds; the separately deterministic timeout transition reaches `UNRESOLVED` only after the full evidence-expiry boundary and every stored observation is strictly stale.
 
 - [ ] **Step 6: Schedule verdict-bound transfers**
 

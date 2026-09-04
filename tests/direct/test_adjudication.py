@@ -531,10 +531,10 @@ def test_validator_disagreement_rolls_back_contract_state_and_preserves_the_nonc
     assert json.loads(contract.get_workflow("wf-adjudication"))["state"] == "UNRESOLVED"
 
 
-def test_permissionless_dispute_timeout_becomes_unresolved_only_after_the_frozen_delay(
+def test_permissionless_dispute_timeout_waits_until_all_evidence_is_stale(
     disputed, direct_vm
 ):
-    """Break caught: anyone can prematurely end a dispute or re-run timeout after finality."""
+    """Break caught: an outsider can force UNRESOLVED while evidence is still fresh."""
     contract, _, _, resolver = disputed
     direct_vm.sender = resolver
     scheduled = schedule_transfers(direct_vm)
@@ -543,7 +543,24 @@ def test_permissionless_dispute_timeout_becomes_unresolved_only_after_the_frozen
         contract.timeout_dispute_to_unresolved("wf-adjudication", "timeout-retry")
     assert json.loads(contract.get_workflow("wf-adjudication"))["state"] == "DISPUTED"
 
-    warp_authoritative_transaction_time(direct_vm, "2023-11-14T22:28:20+00:00")
+    # The old 900-second recovery window would end the dispute here even
+    # though all evidence remains valid for another 45 minutes.
+    warp_authoritative_transaction_time(direct_vm, "2023-11-14T23:13:19+00:00")
+    with direct_vm.expect_revert("Consensus recovery delay not elapsed"):
+        contract.timeout_dispute_to_unresolved("wf-adjudication", "timeout-retry")
+    assert json.loads(contract.get_workflow("wf-adjudication"))["state"] == "DISPUTED"
+
+    # At the exact 3,600-second boundary the evidence is still eligible for
+    # adjudication, so the defensive per-observation stale check must also
+    # preserve the retry nonce and the hold.
+    warp_authoritative_transaction_time(direct_vm, "2023-11-14T23:13:20+00:00")
+    with direct_vm.expect_revert("Evidence remains fresh"):
+        contract.timeout_dispute_to_unresolved("wf-adjudication", "timeout-retry")
+    assert json.loads(contract.get_workflow("wf-adjudication"))["state"] == "DISPUTED"
+    assert accounting(contract, "wf-adjudication")["reserved"] == "51"
+    assert scheduled == []
+
+    warp_authoritative_transaction_time(direct_vm, "2023-11-14T23:13:21+00:00")
     contract.timeout_dispute_to_unresolved("wf-adjudication", "timeout-retry")
     workflow = json.loads(contract.get_workflow("wf-adjudication"))
     assert workflow["state"] == workflow["outcome"] == "UNRESOLVED"
@@ -561,7 +578,7 @@ def test_timeout_cannot_interrupt_a_successful_adjudication_decision(disputed, d
     install_decision_mocks(direct_vm, verdict(evidence_hashes(contract, "wf-adjudication")))
     direct_vm.sender = resolver
     contract.adjudicate("wf-adjudication", "adjudicate-before-timeout")
-    warp_authoritative_transaction_time(direct_vm, "2023-11-14T22:28:20+00:00")
+    warp_authoritative_transaction_time(direct_vm, "2023-11-14T23:13:21+00:00")
 
     with direct_vm.expect_revert("Invalid state"):
         contract.timeout_dispute_to_unresolved("wf-adjudication", "timeout-after-decision")

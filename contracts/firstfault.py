@@ -62,7 +62,9 @@ class FirstFault(gl.Contract):
     MAX_OBSERVATION_AGE_SECONDS = 3_600
     MAX_REJECTION_REASON_BYTES = 2_048
     MAX_RENDERED_SOURCE_BYTES = 16_384
-    CONSENSUS_RECOVERY_DELAY_SECONDS = 900
+    # A permissionless recovery must never outrun a normal adjudication.  This
+    # is deliberately the same strict-expiry window used for evidence reads.
+    CONSENSUS_RECOVERY_DELAY_SECONDS = MAX_OBSERVATION_AGE_SECONDS
 
     # Frozen adjudication policy. A workflow's caller can supply a rejection
     # reason, but cannot replace or weaken these semantic decision rules.
@@ -515,7 +517,7 @@ class FirstFault(gl.Contract):
 
     @gl.public.write
     def timeout_dispute_to_unresolved(self, workflow_id: str, nonce: str) -> None:
-        """Permissionlessly preserve a stalled disputed hold after the frozen delay."""
+        """Recover only after every authoritative evidence observation is stale."""
         workflow = self._workflow(workflow_id)
         self._require_state(workflow, "DISPUTED")
         now = self._submission_timestamp()
@@ -525,8 +527,22 @@ class FirstFault(gl.Contract):
             or now - workflow.dispute_opened_at < self.CONSENSUS_RECOVERY_DELAY_SECONDS
         ):
             raise gl.vm.UserError("Consensus recovery delay not elapsed")
+
+        # The dispute timestamp is a conservative liveness bound, while this
+        # check is the decisive safety guard.  At the exact freshness boundary
+        # adjudicate may still use an observation, so timeout may not consume a
+        # nonce or prevent that decision until every stored observation is
+        # strictly older than the normal adjudication window.
+        for step_index in range(3):
+            step = self._step(workflow_id, step_index)
+            if (
+                step.observed_at == 0
+                or now < step.observed_at
+                or now - step.observed_at <= self.MAX_OBSERVATION_AGE_SECONDS
+            ):
+                raise gl.vm.UserError("Evidence remains fresh")
         self._consume_nonce(nonce)
-        decision = self._safe_unresolved_verdict([], "Consensus recovery delay elapsed")
+        decision = self._safe_unresolved_verdict([], "Consensus recovery evidence expired")
         workflow.outcome = "UNRESOLVED"
         workflow.verdict_json = self._canonical_json(decision)
         workflow.state = "UNRESOLVED"
