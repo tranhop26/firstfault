@@ -87,6 +87,30 @@ def install_decision_mocks(direct_vm, decision, *, source_text=SOURCE_TEXT):
     direct_vm.mock_llm(PROMPT_PATTERN, json.dumps(decision))
 
 
+def run_with_simulated_consensus_rollback(direct_vm, call):
+    """Model GenVM's transaction rollback when a captured validator disagrees.
+
+    Direct mode deliberately returns the leader result before consensus.  A
+    real GenVM rejects the whole transaction when this validator returns
+    False, so this small harness restores the pre-transaction VM snapshot.
+    Integration tests must still prove the network boundary itself.
+    """
+    snapshot = direct_vm.snapshot()
+    call()
+    agreed = direct_vm.run_validator()
+    if not agreed:
+        direct_vm.revert(snapshot)
+    return agreed
+
+
+def warp_authoritative_transaction_time(direct_vm, timestamp):
+    """Advance the direct runner's VM clock and its cached raw message timestamp."""
+    direct_vm.warp(timestamp)
+    import genlayer.gl as runtime_gl
+
+    runtime_gl.message_raw["datetime"] = timestamp
+
+
 def make_disputed(
     contract,
     direct_vm,
@@ -298,6 +322,22 @@ def test_writer_first_breach_pays_compliant_workers_and_refunds_only_writer_hold
                 "reasons": [reason(0), reason(1, material=True, causal=False), reason(2)],
             },
         ),
+        (
+            "unresolved-reason-flags",
+            lambda value: {
+                **verdict(
+                    value,
+                    outcome="UNRESOLVED",
+                    statuses=("UNRESOLVED",) * 3,
+                    confidence="LOW",
+                ),
+                "reasons": [
+                    reason(0, confidence="LOW", material=True, causal=True),
+                    reason(1, confidence="LOW"),
+                    reason(2, confidence="LOW"),
+                ],
+            },
+        ),
         ("model-address", lambda value: {**verdict(value), "recipient": "0x1111111111111111111111111111111111111111"}),
         ("model-amount", lambda value: {**verdict(value), "payout_amount": 51}),
     ],
@@ -324,6 +364,10 @@ def test_unsafe_model_results_become_unresolved_and_move_no_held_value(
     assert values["reserved"] == "51"
     assert values["payout_scheduled"] == values["refund_scheduled"] == "0"
     assert_conserved(values)
+    assert all(
+        item["material"] is False and item["causal"] is False
+        for item in workflow["verdict"]["reasons"]
+    )
 
 
 def test_first_breach_refunds_every_breached_hold_but_records_the_earliest_one(
@@ -389,6 +433,139 @@ def test_stale_stored_evidence_becomes_unresolved_before_value_moves(disputed, d
     assert json.loads(contract.get_workflow("wf-adjudication"))["state"] == "UNRESOLVED"
     assert scheduled == []
     assert accounting(contract, "wf-adjudication")["reserved"] == "51"
+
+
+def test_recent_submission_cannot_settle_an_observation_that_has_expired(
+    direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie, direct_accounts
+):
+    """Break caught: evidence remains eligible for a second hour after a delayed submit."""
+    direct_vm.warp("2023-11-14T22:13:20+00:00")
+    contract = direct_deploy("contracts/firstfault.py")
+    orchestrator, publisher, resolver = direct_accounts[:3]
+    late_terms = evidence_terms()
+    late_terms.update(
+        {
+            "research_deadline": EVIDENCE_NOW + 4_000,
+            "writer_deadline": EVIDENCE_NOW + 4_100,
+            "publisher_deadline": EVIDENCE_NOW + 4_200,
+        }
+    )
+    direct_vm.sender = direct_alice
+    create_workflow(
+        contract,
+        orchestrator,
+        direct_bob,
+        direct_charlie,
+        publisher,
+        workflow_id="wf-observation-age",
+        nonce="create-observation-age",
+        terms=late_terms,
+    )
+    direct_vm.value = TOTAL
+    contract.fund_workflow("wf-observation-age", "fund-observation-age")
+    direct_vm.value = 0
+    direct_vm.sender = orchestrator
+    contract.start_workflow("wf-observation-age", "start-observation-age")
+
+    warp_authoritative_transaction_time(direct_vm, "2023-11-14T23:11:40+00:00")
+    submit_required_evidence(
+        contract,
+        direct_vm,
+        direct_bob,
+        direct_charlie,
+        publisher,
+        "wf-observation-age",
+    )
+    direct_vm.sender = direct_alice
+    contract.open_dispute("wf-observation-age", "The source is too old.", "dispute-observation-age")
+    assert json.loads(contract.get_step("wf-observation-age", 0))["observed_at"] == str(EVIDENCE_NOW)
+    assert json.loads(contract.get_step("wf-observation-age", 0))["submitted_at"] == str(EVIDENCE_NOW + 3_500)
+    warp_authoritative_transaction_time(direct_vm, "2023-11-14T23:13:21+00:00")
+    install_decision_mocks(
+        direct_vm,
+        verdict(evidence_hashes(contract, "wf-observation-age")),
+    )
+    scheduled = schedule_transfers(direct_vm)
+    direct_vm.sender = resolver
+
+    contract.adjudicate("wf-observation-age", "adjudicate-observation-age")
+
+    assert json.loads(contract.get_workflow("wf-observation-age"))["state"] == "UNRESOLVED"
+    assert scheduled == []
+    assert accounting(contract, "wf-observation-age")["reserved"] == "51"
+
+
+def test_validator_disagreement_rolls_back_contract_state_and_preserves_the_nonce(
+    disputed, direct_vm
+):
+    """Break caught: a rejected consensus transaction burns the hold or retry nonce."""
+    contract, _, _, resolver = disputed
+    hashes = evidence_hashes(contract, "wf-adjudication")
+    leader = verdict(hashes)
+    install_decision_mocks(direct_vm, leader)
+    direct_vm.sender = resolver
+    before = accounting(contract, "wf-adjudication")
+
+    different_semantics = verdict(
+        hashes,
+        outcome="FIRST_BREACH",
+        first_breach_step=1,
+        statuses=("COMPLIANT", "MATERIAL_BREACH", "COMPLIANT"),
+    )
+
+    def adjudicate_then_swap_validator_mocks():
+        contract.adjudicate("wf-adjudication", "consensus-retry")
+        direct_vm.clear_mocks()
+        install_decision_mocks(direct_vm, different_semantics)
+
+    assert run_with_simulated_consensus_rollback(
+        direct_vm,
+        adjudicate_then_swap_validator_mocks,
+    ) is False
+    assert json.loads(contract.get_workflow("wf-adjudication"))["state"] == "DISPUTED"
+    assert accounting(contract, "wf-adjudication") == before
+
+    direct_vm.clear_mocks()
+    direct_vm.mock_web(re.escape(SOURCE_URL), {"status": 503, "body": "unavailable"})
+    contract.adjudicate("wf-adjudication", "consensus-retry")
+    assert json.loads(contract.get_workflow("wf-adjudication"))["state"] == "UNRESOLVED"
+
+
+def test_permissionless_dispute_timeout_becomes_unresolved_only_after_the_frozen_delay(
+    disputed, direct_vm
+):
+    """Break caught: anyone can prematurely end a dispute or re-run timeout after finality."""
+    contract, _, _, resolver = disputed
+    direct_vm.sender = resolver
+    scheduled = schedule_transfers(direct_vm)
+    assert json.loads(contract.get_workflow("wf-adjudication"))["dispute_opened_at"] == str(EVIDENCE_NOW)
+    with direct_vm.expect_revert("Consensus recovery delay not elapsed"):
+        contract.timeout_dispute_to_unresolved("wf-adjudication", "timeout-retry")
+    assert json.loads(contract.get_workflow("wf-adjudication"))["state"] == "DISPUTED"
+
+    warp_authoritative_transaction_time(direct_vm, "2023-11-14T22:28:20+00:00")
+    contract.timeout_dispute_to_unresolved("wf-adjudication", "timeout-retry")
+    workflow = json.loads(contract.get_workflow("wf-adjudication"))
+    assert workflow["state"] == workflow["outcome"] == "UNRESOLVED"
+    assert workflow["dispute_opened_at"] == str(EVIDENCE_NOW)
+    assert accounting(contract, "wf-adjudication")["reserved"] == "51"
+    assert scheduled == []
+
+    with direct_vm.expect_revert("Invalid state"):
+        contract.timeout_dispute_to_unresolved("wf-adjudication", "timeout-second")
+
+
+def test_timeout_cannot_interrupt_a_successful_adjudication_decision(disputed, direct_vm):
+    """Break caught: a delayed outsider can overwrite a finalized decision with UNRESOLVED."""
+    contract, _, _, resolver = disputed
+    install_decision_mocks(direct_vm, verdict(evidence_hashes(contract, "wf-adjudication")))
+    direct_vm.sender = resolver
+    contract.adjudicate("wf-adjudication", "adjudicate-before-timeout")
+    warp_authoritative_transaction_time(direct_vm, "2023-11-14T22:28:20+00:00")
+
+    with direct_vm.expect_revert("Invalid state"):
+        contract.timeout_dispute_to_unresolved("wf-adjudication", "timeout-after-decision")
+    assert json.loads(contract.get_workflow("wf-adjudication"))["state"] == "DECISION_PENDING_FINALITY"
 
 
 def test_validator_compares_semantics_for_all_steps_but_ignores_reason_prose(

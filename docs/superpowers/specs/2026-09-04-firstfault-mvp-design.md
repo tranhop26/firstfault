@@ -24,7 +24,7 @@ GenLayer establishes one fact:
 
 The structured result is `ACCEPT_ALL`, `FIRST_BREACH`, or `UNRESOLVED`, plus the first-breach step, per-step status, concise reasons, and cited evidence hashes. Validators compare the semantic decision fields, not JSON shape or free-form wording.
 
-The adjudication uses `gl.vm.run_nondet` with a custom validator. `run_nondet_unsafe` is permitted only as a documented runtime fallback. Storage is read before the nondeterministic closure and captured as immutable input. One optional source URL per Research evidence may be rendered inside the nondeterministic block; unavailable or contradictory evidence leads to `UNRESOLVED`, never a favorable default.
+The adjudication uses `gl.vm.run_nondet` with a custom validator. `run_nondet_unsafe` is permitted only as a documented runtime fallback. Storage is read before the nondeterministic closure and captured as immutable input. One optional source URL per Research evidence may be rendered inside the nondeterministic block; unavailable, malformed, or low-confidence leader results become `UNRESOLVED`, never a favorable default. A validator disagreement terminates and rolls back that GenVM transaction, leaving the workflow `DISPUTED` with its hold unchanged. After a frozen 900-second interval from the contract-derived `dispute_opened_at`, anyone may call `timeout_dispute_to_unresolved`; this deterministic, zero-transfer recovery transition makes the stalled dispute eligible for the Task 6 cure or unanimous-settlement paths.
 
 ## On-chain consequence
 
@@ -49,7 +49,8 @@ From review:
 - `accept_workflow → ACCEPTED_PENDING_FINALITY → SETTLED_SUCCESS`
 - `cancel_workflow` with funded holds `→ CANCELED_PENDING_FINALITY → SETTLED_SUCCESS`
 - `open_dispute → DISPUTED → ADJUDICATING → DECISION_PENDING_FINALITY → SETTLED_BREACH`
-- insufficient evidence/consensus → `UNRESOLVED`
+- leader-observable insufficient, stale, unavailable, malformed, or low-confidence evidence → `UNRESOLVED`
+- validator disagreement → transaction rollback → `DISPUTED`; after 900 seconds from `dispute_opened_at`, `timeout_dispute_to_unresolved → UNRESOLVED`
 
 Recovery branches:
 

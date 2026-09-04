@@ -23,6 +23,7 @@ class Workflow:
     paid: bigint
     refunded: bigint
     rejection_reason: str
+    dispute_opened_at: u256
     verdict_json: str
 
 
@@ -60,6 +61,8 @@ class FirstFault(gl.Contract):
     MAX_SOURCE_URL_BYTES = 2_048
     MAX_OBSERVATION_AGE_SECONDS = 3_600
     MAX_REJECTION_REASON_BYTES = 2_048
+    MAX_RENDERED_SOURCE_BYTES = 16_384
+    CONSENSUS_RECOVERY_DELAY_SECONDS = 900
 
     # Frozen adjudication policy. A workflow's caller can supply a rejection
     # reason, but cannot replace or weaken these semantic decision rules.
@@ -283,6 +286,7 @@ class FirstFault(gl.Contract):
             paid=0,
             refunded=0,
             rejection_reason="",
+            dispute_opened_at=0,
             verdict_json="",
         )
         self.steps[workflow_id + ":0"] = Step(
@@ -502,9 +506,30 @@ class FirstFault(gl.Contract):
             raise gl.vm.UserError("Rejection reason required")
         if len(rejection_reason.encode("utf-8")) > self.MAX_REJECTION_REASON_BYTES:
             raise gl.vm.UserError("Rejection reason too large")
+        dispute_opened_at = self._submission_timestamp()
         self._consume_nonce(nonce)
         workflow.rejection_reason = rejection_reason.strip()
+        workflow.dispute_opened_at = dispute_opened_at
         workflow.state = "DISPUTED"
+        self.workflows[workflow_id] = workflow
+
+    @gl.public.write
+    def timeout_dispute_to_unresolved(self, workflow_id: str, nonce: str) -> None:
+        """Permissionlessly preserve a stalled disputed hold after the frozen delay."""
+        workflow = self._workflow(workflow_id)
+        self._require_state(workflow, "DISPUTED")
+        now = self._submission_timestamp()
+        if (
+            workflow.dispute_opened_at == 0
+            or now < workflow.dispute_opened_at
+            or now - workflow.dispute_opened_at < self.CONSENSUS_RECOVERY_DELAY_SECONDS
+        ):
+            raise gl.vm.UserError("Consensus recovery delay not elapsed")
+        self._consume_nonce(nonce)
+        decision = self._safe_unresolved_verdict([], "Consensus recovery delay elapsed")
+        workflow.outcome = "UNRESOLVED"
+        workflow.verdict_json = self._canonical_json(decision)
+        workflow.state = "UNRESOLVED"
         self.workflows[workflow_id] = workflow
 
     @gl.public.write
@@ -530,6 +555,8 @@ class FirstFault(gl.Contract):
                 or step.output_hash == ""
                 or step.brief_hash == ""
                 or step.schema_version != self.EVIDENCE_SCHEMA_VERSION
+                or decision_timestamp < step.observed_at
+                or decision_timestamp - step.observed_at > self.MAX_OBSERVATION_AGE_SECONDS
                 or decision_timestamp < step.submitted_at
                 or decision_timestamp - step.submitted_at > self.MAX_OBSERVATION_AGE_SECONDS
             ):
@@ -570,6 +597,8 @@ class FirstFault(gl.Contract):
                     source_text = gl.nondet.web.render(research_source_url, mode="text")
                     if not isinstance(source_text, str) or source_text.strip() == "":
                         return unresolved("Research source unavailable")
+                    if len(source_text.encode("utf-8")) > self.MAX_RENDERED_SOURCE_BYTES:
+                        return unresolved("Research source too large")
                     prompt = self._adjudication_prompt(
                         rubric,
                         rubric_version,
@@ -748,7 +777,11 @@ class FirstFault(gl.Contract):
                 seen_citations.append(citation)
 
             if outcome == "UNRESOLVED":
-                if first_breach != -1 or any(item["status"] != "UNRESOLVED" for item in normalized_statuses):
+                if (
+                    first_breach != -1
+                    or any(item["status"] != "UNRESOLVED" for item in normalized_statuses)
+                    or any(item["material"] or item["causal"] for item in normalized_reasons)
+                ):
                     return fallback
                 return {
                     "outcome": "UNRESOLVED",
@@ -849,6 +882,8 @@ class FirstFault(gl.Contract):
         }
         if workflow.rejection_reason != "":
             result["rejection_reason"] = workflow.rejection_reason
+        if workflow.dispute_opened_at != 0:
+            result["dispute_opened_at"] = str(workflow.dispute_opened_at)
         if workflow.verdict_json != "":
             result["verdict"] = json.loads(workflow.verdict_json)
         return self._canonical_json(result)
