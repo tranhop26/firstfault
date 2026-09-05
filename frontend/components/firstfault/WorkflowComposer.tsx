@@ -3,15 +3,29 @@
 import { useState } from "react";
 import type { Address } from "viem";
 import type { CreateWorkflowInput } from "@/lib/contracts/FirstFault";
+import type { ProjectedStatus } from "@/lib/firstfault/status";
+import { TransactionStatus } from "./TransactionStatus";
 
-export function WorkflowComposer({ disabled, onCreate }: { disabled: boolean; onCreate: (input: CreateWorkflowInput) => Promise<unknown> }) {
+type WorkflowComposerProps = {
+  disabled: boolean;
+  onCreate: (input: CreateWorkflowInput) => Promise<unknown>;
+  status: ProjectedStatus;
+  parentHash: string | null;
+  childHashes: string[];
+};
+
+export function WorkflowComposer({ disabled, onCreate, status, parentHash, childHashes }: WorkflowComposerProps) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ id: "", orchestrator: "", researcher: "", writer: "", publisher: "", research: "", writing: "", publishing: "", researchAmount: "10", writerAmount: "10", publisherAmount: "10" });
   const set = (name: keyof typeof form, value: string) => setForm((current) => ({ ...current, [name]: value }));
   const create = async () => {
     const now = Math.floor(Date.now() / 1000);
-    await onCreate({ workflowId: form.id.trim(), orchestrator: form.orchestrator as Address, researcher: form.researcher as Address, writer: form.writer as Address, publisher: form.publisher as Address, researchBrief: form.research, writerBrief: form.writing, publisherBrief: form.publishing, amounts: [BigInt(form.researchAmount), BigInt(form.writerAmount), BigInt(form.publisherAmount)], deadlines: [BigInt(now + 3600), BigInt(now + 7200), BigInt(now + 10800)], nonce: `create-${Date.now()}-${crypto.randomUUID()}` });
-    setOpen(false);
+    try {
+      await onCreate({ workflowId: form.id.trim(), orchestrator: form.orchestrator as Address, researcher: form.researcher as Address, writer: form.writer as Address, publisher: form.publisher as Address, researchBrief: form.research, writerBrief: form.writing, publisherBrief: form.publishing, amounts: [BigInt(form.researchAmount), BigInt(form.writerAmount), BigInt(form.publisherAmount)], deadlines: [BigInt(now + 3600), BigInt(now + 7200), BigInt(now + 10800)], nonce: `create-${Date.now()}-${crypto.randomUUID()}` });
+      setOpen(false);
+    } catch {
+      // The shared mutation state below renders the exact contract/finality result.
+    }
   };
   return <>
     <button className="ff-button ff-button-light" disabled={disabled} onClick={() => setOpen(true)}>＋ Create workflow</button>
@@ -25,6 +39,7 @@ export function WorkflowComposer({ disabled, onCreate }: { disabled: boolean; on
         {(["research", "writing", "publishing"] as const).map((name) => <label className="ff-form-wide" key={name}>{name[0].toUpperCase() + name.slice(1)} brief<textarea value={form[name]} onChange={(e) => set(name, e.target.value)} /></label>)}
         {(["researchAmount", "writerAmount", "publisherAmount"] as const).map((name) => <label key={name}>{name.replace("Amount", " hold")}<input type="number" min="1" value={form[name]} onChange={(e) => set(name, e.target.value)} /></label>)}
       </div>
+      {status.phase !== "READY" && <TransactionStatus status={status} parentHash={parentHash} childHashes={childHashes} />}
       <div className="ff-modal-actions"><button className="ff-button ff-button-outline" onClick={() => setOpen(false)}>Cancel</button><button className="ff-button ff-button-primary" onClick={create}>Create on Studionet</button></div>
     </section></div>}
   </>;

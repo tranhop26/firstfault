@@ -21,6 +21,10 @@ __pycache__/
 /.worktrees/
 /frontend/.next
 /frontend/next-env.d.ts
+/frontend/AGENTS.md
+/frontend/CLAUDE.md
+/CLAUDE.md
+/docs/superpowers/
 /frontend/bun.lock
 /frontend/package-lock.json
 *.compiled.js

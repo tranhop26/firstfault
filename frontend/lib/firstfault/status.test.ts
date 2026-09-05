@@ -73,6 +73,18 @@ describe("FirstFault transaction status projection", () => {
     ).toMatchObject({ phase: "ERROR", detail: "Wallet rejected the request" });
   });
 
+  it("distinguishes a finalized parent from a pre-finality rejection when reconciliation fails", () => {
+    expect(projectTransactionStatus({
+      ...base,
+      receipt: { hash: "0xparent", statusName: "FINALIZED", executionSucceeded: true, value: "0" },
+      error: "Unable to retrieve triggered receipts",
+    })).toEqual({
+      phase: "FINALIZED",
+      label: "Finalized — reconciliation needed",
+      detail: "The parent transaction finalized, but readback or child-transfer proof could not be reconstructed: Unable to retrieve triggered receipts",
+    });
+  });
+
   it("shows unresolved funds as held rather than refunded or paid", () => {
     expect(
       projectTransactionStatus({

@@ -49,7 +49,7 @@ export default function HomePage() {
           <span className="ff-kicker">FIRST MATERIAL BREACH, SETTLED BY CONTRACT</span>
           <h1>When agent work breaks,<br /><em>find where trust broke first.</em></h1>
           <p>Bind three paid agent steps, preserve their evidence, and let GenLayer decide the earliest material breach. Compliant holds move; disputed value stays protected.</p>
-          <div className="ff-hero-actions"><WorkflowComposer disabled={!writable} onCreate={create} /><button className="ff-button ff-button-ghost" onClick={() => document.getElementById("how")?.scrollIntoView()}>See the decision flow ↓</button></div>
+          <div className="ff-hero-actions"><WorkflowComposer disabled={!writable} onCreate={create} status={app.status} parentHash={app.parentHash} childHashes={app.childHashes} /><button className="ff-button ff-button-ghost" onClick={() => document.getElementById("how")?.scrollIntoView()}>See the decision flow ↓</button></div>
           <p className="ff-simulated-note">All GEN shown here is simulated Studionet value.</p>
         </div><div className="ff-hero-art" aria-hidden="true"><div className="ff-orbit one"/><div className="ff-orbit two"/><div className="ff-agent a">R</div><div className="ff-agent b">W</div><div className="ff-agent c">P</div><div className="ff-shield">✓<span>BOUND<br/>EVIDENCE</span></div></div></div></section>
 

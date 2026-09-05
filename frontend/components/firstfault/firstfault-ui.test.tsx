@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AgentTankBadge, AgentTankEntryLabel } from "../AgentTankBadge";
 import { TransactionStatus } from "./TransactionStatus";
+import { WorkflowComposer } from "./WorkflowComposer";
 import { WorkflowTimeline } from "./WorkflowTimeline";
 
 afterEach(cleanup);
@@ -66,5 +67,32 @@ describe("FirstFault truthful interface", () => {
       .toBe(`https://explorer-studio.genlayer.com/tx/${parentHash}`);
     expect(screen.getByRole("link", { name: /transfer 1/i }).getAttribute("href"))
       .toBe(`https://explorer-studio.genlayer.com/tx/${childHash}`);
+  });
+
+  it("keeps a rejected create action handled inside the workflow dialog", async () => {
+    const onCreate = vi.fn().mockRejectedValue(new Error("Workflow already exists"));
+    render(<WorkflowComposer disabled={false} onCreate={onCreate} status={{ phase: "ERROR", label: "Action failed", detail: "Workflow already exists" }} parentHash={null} childHashes={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /create workflow/i }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Workflow ID" }), {
+      target: { value: "duplicate-workflow" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create on Studionet" }));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
+    expect(screen.getByRole("dialog", { name: /create a three-agent workflow/i })).toBeTruthy();
+    expect(screen.getByText("Action failed")).toBeTruthy();
+    expect(screen.getByText("Workflow already exists")).toBeTruthy();
+  });
+
+  it("closes the workflow dialog after a successful create action", async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+    render(<WorkflowComposer disabled={false} onCreate={onCreate} status={{ phase: "READY", label: "Ready", detail: "Contract state is loaded from Studionet." }} parentHash={null} childHashes={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /create workflow/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Create on Studionet" }));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /create a three-agent workflow/i })).toBeNull());
   });
 });

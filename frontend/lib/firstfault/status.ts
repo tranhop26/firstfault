@@ -46,6 +46,13 @@ export function canWrite(input: { connected: boolean; correctNetwork: boolean; c
 }
 
 export function projectTransactionStatus(input: TransactionProjectionInput): ProjectedStatus {
+  if (input.error && input.receipt?.statusName === "FINALIZED" && input.receipt.executionSucceeded) {
+    return {
+      phase: "FINALIZED",
+      label: "Finalized — reconciliation needed",
+      detail: `The parent transaction finalized, but readback or child-transfer proof could not be reconstructed: ${input.error}`,
+    };
+  }
   if (input.error) return { phase: "ERROR", label: "Action failed", detail: input.error };
   if (!input.connected) return { phase: "DISCONNECTED", label: "Wallet not connected", detail: "Connect a wallet to submit a contract action." };
   if (!input.correctNetwork) return { phase: "WRONG_NETWORK", label: "Wrong network", detail: "Switch to GenLayer Studionet before continuing." };
