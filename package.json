@@ -9,9 +9,14 @@
     "start": "cd frontend && npm run start",
     "lint": "cd frontend && npm run lint",
     "test": "cd frontend && npm test",
-    "deploy": "genlayer deploy"
+    "deploy": "tsx deploy/deployScript.ts",
+    "lint:deploy": "tsc --noEmit --project tsconfig.json",
+    "verify:deployment": "npm --prefix frontend test -- lib/contracts/verifyDeployment.test.ts lib/contracts/deploymentManifest.test.ts lib/contracts/deployFirstFault.test.ts"
   },
   "devDependencies": {
-    "genlayer-js": "^1.1.8"
+    "@types/node": "24.9.1",
+    "genlayer-js": "^1.1.8",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3"
   }
 }

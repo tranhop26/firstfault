@@ -48,6 +48,17 @@ export function assertPrivateKey(
   }
 }
 
+export function redactSecrets(
+  message: string,
+  secrets: ReadonlyArray<string | undefined>,
+): string {
+  let safeMessage = message;
+  for (const secret of secrets) {
+    if (secret) safeMessage = safeMessage.replaceAll(secret, "[REDACTED]");
+  }
+  return safeMessage;
+}
+
 export function verifySourceAndSchema(
   expectedSource: string,
   deployedSource: string,

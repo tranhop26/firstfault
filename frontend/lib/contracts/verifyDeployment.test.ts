@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import {
   EXPECTED_FIRSTFAULT_METHODS,
   assertPrivateKey,
+  redactSecrets,
   verifySourceAndSchema,
 } from "../../../scripts/deploymentEvidence";
 import {
@@ -71,6 +72,16 @@ describe("deployment receipt verification", () => {
     expect(() => assertPrivateKey(undefined)).toThrow("0x-prefixed 32-byte key");
     expect(() => assertPrivateKey("0x12")).toThrow("0x-prefixed 32-byte key");
     expect(() => assertPrivateKey(`0x${"a".repeat(64)}`)).not.toThrow();
+  });
+
+  test("redacts private material from deployment errors", () => {
+    const privateKey = `0x${"a".repeat(64)}`;
+    expect(redactSecrets(`RPC rejected ${privateKey}`, [privateKey])).toBe(
+      "RPC rejected [REDACTED]",
+    );
+    expect(redactSecrets("ordinary failure", [undefined, ""])).toBe(
+      "ordinary failure",
+    );
   });
 
   test("rejects a deployed source mismatch", () => {

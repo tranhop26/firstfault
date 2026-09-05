@@ -9,7 +9,7 @@ import {
 
 type Address = `0x${string}`;
 
-type DeploymentReceiptLike = {
+export type DeploymentReceiptLike = {
   statusName?: string;
   txExecutionResultName?: string;
   to_address?: string;
