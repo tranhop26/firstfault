@@ -131,8 +131,8 @@ export default class FirstFault {
     const receipt = await this.client.waitForTransactionReceipt({
       hash,
       status: TransactionStatus.FINALIZED,
-      interval: this.endpoint ? 20 : 5_000,
-      retries: this.endpoint ? 100 : 120,
+      interval: this.endpoint ? 250 : 5_000,
+      retries: this.endpoint ? 600 : 120,
     });
     if (!executionSucceeded(receipt)) {
       throw new Error(`FirstFault ${functionName} finalized with failed execution`);
@@ -239,10 +239,51 @@ export default class FirstFault {
     );
   }
 
+  async getTransactionReceipt(hash: TransactionHash): Promise<GenLayerTransaction> {
+    return this.client.getTransaction({ hash });
+  }
+
+  async getTriggeredReceiptsByHash(hash: TransactionHash): Promise<GenLayerTransaction[]> {
+    const childIds = await this.client.getTriggeredTransactionIds({ hash });
+    const children = await Promise.all(
+      childIds.map(async (childHash) => {
+        await this.client.waitForTransactionReceipt({
+          hash: childHash,
+          status: TransactionStatus.FINALIZED,
+          interval: this.endpoint ? 250 : 5_000,
+          retries: this.endpoint ? 600 : 120,
+        });
+        return this.client.getTransaction({ hash: childHash });
+      }),
+    );
+    return children.map((child) => {
+      const rpcChild = child as GenLayerTransaction & {
+        triggered_by?: string;
+        origin_address?: string;
+      };
+      const comesFromContract = child.from_address?.toLowerCase() === this.contractAddress.toLowerCase()
+        && rpcChild.origin_address?.toLowerCase() === this.contractAddress.toLowerCase();
+      const belongsToParent = rpcChild.triggered_by?.toLowerCase() === hash.toLowerCase();
+      const hasExternalPayload = Boolean(child.to_address) && BigInt(child.value ?? 0) > 0n && child.consensus_data == null;
+      // genlayer-js currently maps the numeric transaction type 0 to undefined.
+      const hasExternalType = child.type === 0 || child.type === undefined;
+      if (
+        child.statusName !== TransactionStatus.FINALIZED
+        || !hasExternalType
+        || !comesFromContract
+        || !belongsToParent
+        || !hasExternalPayload
+      ) {
+        const childHash = String(child.hash ?? child.txId ?? "unknown");
+        throw new Error(`FirstFault child ${childHash} did not finalize as an external value transfer`);
+      }
+      return child.type === undefined ? { ...child, type: 0 } : child;
+    });
+  }
+
   async getTriggeredReceipts(receipt: GenLayerTransaction): Promise<GenLayerTransaction[]> {
     const hash = (receipt.hash ?? receipt.txId) as TransactionHash | undefined;
     if (!hash) return [];
-    const childIds = await this.client.getTriggeredTransactionIds({ hash });
-    return Promise.all(childIds.map((childHash) => this.client.getTransaction({ hash: childHash })));
+    return this.getTriggeredReceiptsByHash(hash);
   }
 }

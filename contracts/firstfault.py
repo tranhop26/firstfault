@@ -81,6 +81,17 @@ class Settlement:
     buyer_refund: bigint
 
 
+@gl.evm.contract_interface
+class _Recipient:
+    """External chain-layer target used for native GEN transfers to EOAs."""
+
+    class View:
+        pass
+
+    class Write:
+        pass
+
+
 class FirstFault(gl.Contract):
     """The intentionally frozen source of truth for workflow lifecycle state."""
 
@@ -592,7 +603,7 @@ class FirstFault(gl.Contract):
             step.state = "REFUND_SCHEDULED" if refund_amount > 0 else "CANCELED"
             self.steps[workflow_id + ":" + str(step_index)] = step
         if refund_amount > 0:
-            gl.get_contract_at(workflow.buyer).emit_transfer(value=u256(refund_amount))
+            _Recipient(workflow.buyer).emit_transfer(value=u256(refund_amount))
 
     @gl.public.write.payable
     def fund_workflow(self, workflow_id: str, nonce: str) -> None:
@@ -644,7 +655,7 @@ class FirstFault(gl.Contract):
             )
             self.steps[workflow_id + ":" + str(step_index)] = step
             if step.amount > 0:
-                gl.get_contract_at(step.worker).emit_transfer(value=u256(step.amount))
+                _Recipient(step.worker).emit_transfer(value=u256(step.amount))
 
     @gl.public.write
     def open_dispute(self, workflow_id: str, rejection_reason: str, nonce: str) -> None:
@@ -926,11 +937,11 @@ class FirstFault(gl.Contract):
             )
             self.steps[workflow_id + ":" + str(step_index)] = step
             if worker_amounts[step_index] > 0:
-                gl.get_contract_at(step.worker).emit_transfer(
+                _Recipient(step.worker).emit_transfer(
                     value=u256(worker_amounts[step_index])
                 )
         if settlement.buyer_refund > 0:
-            gl.get_contract_at(workflow.buyer).emit_transfer(
+            _Recipient(workflow.buyer).emit_transfer(
                 value=u256(settlement.buyer_refund)
             )
 
@@ -1109,7 +1120,7 @@ class FirstFault(gl.Contract):
         workflow.state = "DECISION_PENDING_FINALITY"
         self.workflows[workflow_id] = workflow
         for transfer in scheduled:
-            gl.get_contract_at(transfer["recipient"]).emit_transfer(value=u256(transfer["amount"]))
+            _Recipient(transfer["recipient"]).emit_transfer(value=u256(transfer["amount"]))
 
     def _safe_unresolved_verdict(self, evidence_hashes: list, reason: str) -> dict:
         reasons = []

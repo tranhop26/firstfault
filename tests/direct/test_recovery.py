@@ -610,6 +610,7 @@ def test_unanimous_execution_schedules_exact_allocation_once_and_preserves_conse
         (to_hex(publisher), 13, "finalized"),
         (to_hex(buyer), 10, "finalized"),
     ]
+    assert all(item["external"] for item in scheduled)
 
     with direct_vm.expect_revert("Invalid state"):
         contract.execute_mutual_settlement("wf-recovery", "execute-twice")

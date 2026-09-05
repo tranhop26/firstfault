@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AgentTankBadge, AgentTankEntryLabel } from "@/components/AgentTankBadge";
 import { WorkflowComposer } from "@/components/firstfault/WorkflowComposer";
 import { WorkflowTimeline } from "@/components/firstfault/WorkflowTimeline";
 import { EvidencePanel } from "@/components/firstfault/EvidencePanel";
@@ -33,7 +34,7 @@ export default function HomePage() {
       <header className="ff-header">
         <div className="ff-topbar"><div className="ff-shell"><span>FirstFault for agentic commerce</span><nav><a href="#how">How it works</a><a href="https://docs.genlayer.com" target="_blank" rel="noreferrer">GenLayer docs</a><span className="ff-network-dot">Studionet</span></nav></div></div>
         <div className="ff-mainbar"><div className="ff-shell ff-mainbar-inner">
-          <a className="ff-logo" href="#"><span className="ff-logo-mark">F</span><span>FirstFault<small>verifiable agent settlement</small></span></a>
+          <div className="ff-brand-cluster"><a className="ff-logo" href="#"><span className="ff-logo-mark">F</span><span>FirstFault<small>verifiable agent settlement</small></span></a><AgentTankBadge /></div>
           <form className="ff-search" onSubmit={(event) => { event.preventDefault(); setWorkflowId(search.trim()); }}><input aria-label="Workflow ID" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by exact workflow ID" /><button>Inspect case</button></form>
           <div className="ff-wallet">
             {app.wallet.isConnected ? <><span title={app.wallet.address ?? ""}>{short(app.wallet.address ?? "")}</span><button onClick={app.wallet.disconnectWallet}>Disconnect</button></> : <button className="ff-connect" onClick={() => app.wallet.connectWallet()}>Connect wallet</button>}
@@ -44,6 +45,7 @@ export default function HomePage() {
 
       <main>
         <section className="ff-hero"><div className="ff-shell ff-hero-grid"><div>
+          <AgentTankEntryLabel />
           <span className="ff-kicker">FIRST MATERIAL BREACH, SETTLED BY CONTRACT</span>
           <h1>When agent work breaks,<br /><em>find where trust broke first.</em></h1>
           <p>Bind three paid agent steps, preserve their evidence, and let GenLayer decide the earliest material breach. Compliant holds move; disputed value stays protected.</p>
@@ -99,7 +101,7 @@ export default function HomePage() {
           </>}
         </div>
       </main>
-      <footer><div className="ff-shell"><div className="ff-logo"><span className="ff-logo-mark">F</span><span>FirstFault</span></div><p>Intentionally frozen GenLayer contract · simulated Studionet value</p><div><a href="https://genlayer.com" target="_blank" rel="noreferrer">GenLayer</a><a href="https://genlayer-explorer.vercel.app" target="_blank" rel="noreferrer">Explorer</a></div></div></footer>
+      <footer><div className="ff-shell"><div className="ff-footer-brand"><div className="ff-logo"><span className="ff-logo-mark">F</span><span>FirstFault</span></div><AgentTankBadge compact /></div><p>Built for Agent Tank · Powered by GenLayer Studionet<br/>Intentionally frozen contract · simulated Studionet value</p><div><a href="https://genlayer.com" target="_blank" rel="noreferrer">GenLayer</a><a href="https://genlayer-explorer.vercel.app" target="_blank" rel="noreferrer">Explorer</a></div></div></footer>
     </div>
   );
 }

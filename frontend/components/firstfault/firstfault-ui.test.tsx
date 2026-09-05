@@ -2,6 +2,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { AgentTankBadge, AgentTankEntryLabel } from "../AgentTankBadge";
 import { TransactionStatus } from "./TransactionStatus";
 import { WorkflowTimeline } from "./WorkflowTimeline";
 
@@ -20,6 +21,13 @@ const steps = [0, 1, 2].map((stepIndex) => ({
 }));
 
 describe("FirstFault truthful interface", () => {
+  it("identifies the project as a GenLayer Agent Tank 2026 entry", () => {
+    render(<><AgentTankBadge /><AgentTankEntryLabel /></>);
+    expect(screen.getByText("Built for GenLayer")).toBeTruthy();
+    expect(screen.getByText("AGENT TANK 2026")).toBeTruthy();
+    expect(screen.getByText("Agent Tank Hackathon Entry")).toBeTruthy();
+  });
+
   it("renders all three immutable workflow steps and simulated holds", () => {
     render(<WorkflowTimeline steps={steps} activeAddress={null} canAct={false} onSubmit={() => undefined} />);
     expect(screen.getAllByRole("article")).toHaveLength(3);

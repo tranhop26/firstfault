@@ -9,6 +9,7 @@ export type TransactionEvidence = {
   hash: string;
   statusName: string;
   executionSucceeded: boolean;
+  value: string;
 };
 
 export type TransactionProjectionInput = {
@@ -59,9 +60,20 @@ export function projectTransactionStatus(input: TransactionProjectionInput): Pro
   const scheduled = input.readback
     ? BigInt(input.readback.payout_scheduled) + BigInt(input.readback.refund_scheduled)
     : 0n;
-  const allChildrenSucceeded = input.triggeredReceipts.length > 0 && input.triggeredReceipts.every((receipt) => receipt.statusName === "FINALIZED" && receipt.executionSucceeded);
-  if (input.receipt?.statusName === "FINALIZED" && input.receipt.executionSucceeded && scheduled > 0n && !allChildrenSucceeded) {
-    return { phase: "TRANSFER_PENDING", label: "Transfer pending", detail: "The parent decision finalized; child transfers still need execution proof." };
+  const finalizedChildValue = input.triggeredReceipts.reduce(
+    (total, child) => total + (child.statusName === "FINALIZED" && child.executionSucceeded ? BigInt(child.value) : 0n),
+    0n,
+  );
+  const allChildrenSucceeded = input.triggeredReceipts.length > 0
+    && input.triggeredReceipts.every((child) => child.statusName === "FINALIZED" && child.executionSucceeded)
+    && finalizedChildValue === scheduled;
+  if (input.receipt?.statusName === "FINALIZED" && input.receipt.executionSucceeded && scheduled > 0n && allChildrenSucceeded) {
+    return { phase: "SUCCESS", label: "Transfers finalized", detail: "Every scheduled transfer finalized for the exact contract-accounted value." };
+  }
+  if (scheduled > 0n) {
+    return input.receipt?.statusName === "FINALIZED" && input.receipt.executionSucceeded
+      ? { phase: "TRANSFER_PENDING", label: "Transfer pending", detail: "The parent decision finalized; child transfers still need execution proof." }
+      : { phase: "TRANSFER_PENDING", label: "Transfer proof unavailable", detail: "The contract scheduled value, but this browser has not reconstructed exact finalized child-transfer proof." };
   }
   if (input.receipt?.statusName === "FINALIZED" && input.receipt.executionSucceeded) {
     return { phase: "FINALIZED", label: "Finalized", detail: "The contract action finalized. Readback is being reconciled." };

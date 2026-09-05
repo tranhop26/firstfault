@@ -28,11 +28,39 @@ describe("FirstFault transaction status projection", () => {
     expect(
       projectTransactionStatus({
         ...base,
-        receipt: { hash: "0xparent", statusName: "FINALIZED", executionSucceeded: true },
-        triggeredReceipts: [{ hash: "0xchild", statusName: "PENDING", executionSucceeded: false }],
+        receipt: { hash: "0xparent", statusName: "FINALIZED", executionSucceeded: true, value: "0" },
+        triggeredReceipts: [{ hash: "0xchild", statusName: "PENDING", executionSucceeded: false, value: "30" }],
         readback: { state: "DECISION_PENDING_FINALITY", reserved: "0", payout_scheduled: "30", refund_scheduled: "0" },
       }),
     ).toMatchObject({ phase: "TRANSFER_PENDING", label: "Transfer pending" });
+  });
+
+  it("does not call an already-scheduled workflow ready when local receipt proof is absent", () => {
+    expect(projectTransactionStatus({
+      ...base,
+      readback: { state: "DECISION_PENDING_FINALITY", reserved: "0", payout_scheduled: "30", refund_scheduled: "0" },
+    })).toMatchObject({ phase: "TRANSFER_PENDING", label: "Transfer proof unavailable" });
+  });
+
+  it("reports success only when finalized children equal the scheduled value", () => {
+    const receipt = { hash: "0xparent", statusName: "FINALIZED", executionSucceeded: true, value: "0" };
+    const readback = { state: "DECISION_PENDING_FINALITY", reserved: "0", payout_scheduled: "30", refund_scheduled: "0" };
+    expect(projectTransactionStatus({
+      ...base,
+      receipt,
+      triggeredReceipts: [
+        { hash: "0xone", statusName: "FINALIZED", executionSucceeded: true, value: "11" },
+        { hash: "0xtwo", statusName: "FINALIZED", executionSucceeded: true, value: "19" },
+      ],
+      readback,
+    })).toMatchObject({ phase: "SUCCESS", label: "Transfers finalized" });
+
+    expect(projectTransactionStatus({
+      ...base,
+      receipt,
+      triggeredReceipts: [{ hash: "0xpartial", statusName: "FINALIZED", executionSucceeded: true, value: "11" }],
+      readback,
+    })).toMatchObject({ phase: "TRANSFER_PENDING" });
   });
 
   it("keeps errors visible even when stale readback exists", () => {

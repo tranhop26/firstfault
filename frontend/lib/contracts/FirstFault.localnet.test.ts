@@ -10,7 +10,7 @@ import FirstFault from "./FirstFault";
 const endpoint = process.env.GENLAYER_LOCALNET_URL ?? "http://127.0.0.1:4000/api";
 
 describe("FirstFault browser adapter against Localnet", () => {
-  test("separate funded accounts reach READY_FOR_REVIEW through the real adapter", async () => {
+  test("separate funded accounts settle external transfers through the real adapter", async () => {
     const buyer = createAccount();
     const orchestrator = createAccount();
     const researcher = createAccount();
@@ -24,16 +24,22 @@ describe("FirstFault browser adapter against Localnet", () => {
     const code = await readFile(resolve(process.cwd(), "../contracts/firstfault.py"), "utf8");
     const deployClient = createClient({ chain: localnet, endpoint, account: buyer });
     const deployHash = await deployClient.deployContract({ code, account: buyer });
-    const deployReceipt = await deployClient.waitForTransactionReceipt({
+    await deployClient.waitForTransactionReceipt({
       hash: deployHash as Hash,
       status: TransactionStatus.FINALIZED,
-      interval: 20,
-      retries: 100,
+      interval: 250,
+      retries: 600,
     });
+    const deployReceipt = await deployClient.getTransaction({ hash: deployHash as Hash });
     expect(deployReceipt.statusName).toBe("FINALIZED");
+    expect(deployReceipt.consensus_data?.leader_receipt?.[0]?.execution_result).toBe("SUCCESS");
 
     const contractAddress = deployReceipt.to_address as `0x${string}`;
     const adapter = new FirstFault(contractAddress, buyer, endpoint);
+    const balance = async (address: `0x${string}`) => {
+      const raw = await admin.request({ method: "eth_getBalance", params: [address, "latest"] });
+      return BigInt(String(raw));
+    };
     const now = Math.floor(Date.now() / 1000);
     const id = `ts-${Date.now()}`;
 
@@ -61,5 +67,29 @@ describe("FirstFault browser adapter against Localnet", () => {
     await adapter.submitStep(id, 2, "Supported draft.", writerStep.outputHash, "", BigInt(now), `${id}-publisher`);
 
     expect((await adapter.getWorkflow(id)).state).toBe("READY_FOR_REVIEW");
-  }, 60_000);
+
+    const workerBalancesBefore = await Promise.all(
+      [researcher.address, writer.address, publisher.address].map(balance),
+    );
+    expect(await balance(contractAddress)).toBe(51n);
+    adapter.updateAccount(buyer);
+    const parent = await adapter.acceptWorkflow(id, `${id}-accept`);
+    const transfers = await adapter.getTriggeredReceipts(parent);
+    expect(transfers).toHaveLength(3);
+    expect(transfers.every((transfer) => transfer.statusName === "FINALIZED" && transfer.type === 0)).toBe(true);
+    expect(transfers.every((transfer) => transfer.from_address?.toLowerCase() === contractAddress.toLowerCase())).toBe(true);
+    expect(new Set(transfers.map((transfer) => `${transfer.to_address?.toLowerCase()}:${transfer.value}`))).toEqual(
+      new Set([
+        `${researcher.address.toLowerCase()}:11`,
+        `${writer.address.toLowerCase()}:17`,
+        `${publisher.address.toLowerCase()}:23`,
+      ]),
+    );
+    const workerBalancesAfter = await Promise.all(
+      [researcher.address, writer.address, publisher.address].map(balance),
+    );
+    expect(workerBalancesAfter.map((after, index) => after - workerBalancesBefore[index])).toEqual([11n, 17n, 23n]);
+    expect(await balance(contractAddress)).toBe(0n);
+    expect((await adapter.getWorkflow(id)).state).toBe("ACCEPTED_PENDING_FINALITY");
+  }, 1_200_000);
 });

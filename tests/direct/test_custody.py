@@ -120,7 +120,18 @@ def schedule_transfers(direct_vm):
     def capture(_vm, request):
         message = request.get("PostMessage")
         if message is not None:
-            scheduled.append(message)
+            scheduled.append({**message, "external": False})
+            return {"ok": None}
+        message = request.get("EthSend")
+        if message is not None:
+            scheduled.append(
+                {
+                    "address": message["address"],
+                    "value": message["value"],
+                    "on": "finalized",
+                    "external": True,
+                }
+            )
             return {"ok": None}
         return None
 
@@ -267,7 +278,7 @@ def test_only_the_buyer_can_fund_once_and_a_duplicate_rejection_preserves_its_no
 def test_buyer_cancellation_schedules_the_whole_unstarted_refund_without_claiming_completion(
     direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie, direct_accounts
 ):
-    """Break caught: cancellation calls a refund completed before child-transfer finality exists."""
+    """Break caught: a refund is completed early or emitted as an IC call to an EOA."""
     contract = direct_deploy("contracts/firstfault.py")
     orchestrator, publisher = direct_accounts[:2]
     direct_vm.sender = direct_alice
@@ -287,6 +298,7 @@ def test_buyer_cancellation_schedules_the_whole_unstarted_refund_without_claimin
     assert [(transfer["address"].as_hex, int(transfer["value"]), transfer["on"]) for transfer in scheduled] == [
         (to_hex(direct_alice), 51, "finalized"),
     ]
+    assert all(transfer["external"] for transfer in scheduled)
 
 
 def test_only_the_buyer_can_schedule_payouts_and_pending_states_do_not_claim_completion(
@@ -324,6 +336,7 @@ def test_only_the_buyer_can_schedule_payouts_and_pending_states_do_not_claim_com
         (to_hex(direct_charlie), 17, "finalized"),
         (to_hex(publisher), 23, "finalized"),
     ]
+    assert all(transfer["external"] for transfer in scheduled)
 
 
 def test_repeated_acceptance_and_post_start_cancellation_preserve_their_rejected_nonces(

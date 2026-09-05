@@ -1,23 +1,31 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExecutionResult, type GenLayerTransaction } from "genlayer-js/types";
+import { ExecutionResult, TransactionStatus, type GenLayerTransaction, type TransactionHash } from "genlayer-js/types";
 import { isAddress, type Address } from "viem";
 
 import FirstFault, { type CreateWorkflowInput } from "@/lib/contracts/FirstFault";
 import { getContractAddress } from "@/lib/genlayer/client";
 import { useWallet } from "@/lib/genlayer/WalletProvider";
 import { projectTransactionStatus, type TransactionEvidence } from "@/lib/firstfault/status";
+import {
+  clearReconciliationHash,
+  getReconciliationStorage,
+  readReconciliationHash,
+  writeReconciliationHash,
+} from "@/lib/firstfault/reconciliationStorage";
 
 function evidence(receipt: GenLayerTransaction): TransactionEvidence {
-  const executionSucceeded = receipt.txExecutionResultName
+  const externalTransferSucceeded = receipt.type === 0 && receipt.statusName === TransactionStatus.FINALIZED;
+  const executionSucceeded = externalTransferSucceeded || (receipt.txExecutionResultName
     ? receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN
-    : receipt.consensus_data?.leader_receipt?.[0]?.execution_result === "SUCCESS";
+    : receipt.consensus_data?.leader_receipt?.[0]?.execution_result === "SUCCESS");
   return {
     hash: String(receipt.hash ?? receipt.txId ?? ""),
     statusName: String(receipt.statusName ?? receipt.status ?? "UNKNOWN"),
     executionSucceeded,
+    value: String(receipt.value ?? 0),
   };
 }
 
@@ -40,6 +48,7 @@ export function useFirstFault(workflowId: string) {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const enabled = Boolean(contract && workflowId.trim());
+  const reconciliationKey = `firstfault:parent:${configuredAddress.toLowerCase()}:${workflowId.trim()}`;
   const workflowQuery = useQuery({
     queryKey: ["firstfault", configuredAddress, workflowId, "workflow"],
     queryFn: () => contract!.getWorkflow(workflowId),
@@ -63,6 +72,39 @@ export function useFirstFault(workflowId: string) {
     await queryClient.invalidateQueries({ queryKey: ["firstfault", configuredAddress, workflowId] });
   };
 
+  useEffect(() => {
+    setReceipt(null);
+    setChildren([]);
+    setActionError(null);
+    if (!contract || !enabled) return;
+    const storage = getReconciliationStorage(window);
+    if (!storage) return;
+    const storedHash = readReconciliationHash(storage, reconciliationKey);
+    if (!storedHash) return;
+    let active = true;
+    setSubmitted(true);
+    Promise.all([
+      contract.getTransactionReceipt(storedHash),
+      contract.getTriggeredReceiptsByHash(storedHash),
+    ])
+      .then(async ([parent, triggered]) => {
+        if (!active) return;
+        setReceipt(evidence(parent));
+        setChildren(triggered.map(evidence));
+        if (triggered.length === 0) clearReconciliationHash(storage, reconciliationKey);
+        await queryClient.invalidateQueries({ queryKey: ["firstfault", configuredAddress, workflowId] });
+      })
+      .catch((cause) => {
+        if (active) setActionError(cause instanceof Error ? cause.message : "Unable to reconcile transfer finality");
+      })
+      .finally(() => {
+        if (active) setSubmitted(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [configuredAddress, contract, enabled, queryClient, reconciliationKey, workflowId]);
+
   const mutation = useMutation({
     mutationFn: async (action: () => Promise<GenLayerTransaction>) => {
       if (!contract) throw new Error("NEXT_PUBLIC_CONTRACT_ADDRESS is not configured with a valid deployed address.");
@@ -74,8 +116,12 @@ export function useFirstFault(workflowId: string) {
       setChildren([]);
       const parent = await action();
       setReceipt(evidence(parent));
+      const parentHash = (parent.hash ?? parent.txId) as TransactionHash | undefined;
+      const storage = getReconciliationStorage(window);
+      if (parentHash && storage) writeReconciliationHash(storage, reconciliationKey, parentHash);
       const triggered = await contract.getTriggeredReceipts(parent);
       setChildren(triggered.map(evidence));
+      if (triggered.length === 0 && storage) clearReconciliationHash(storage, reconciliationKey);
       await refresh();
       return parent;
     },
