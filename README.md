@@ -100,6 +100,12 @@ Status: **Verified on Studionet.** The frozen contract is deployed at [`0x2271AE
 
 Production: [https://firstfault.vercel.app](https://firstfault.vercel.app). Vercel deployed commit `35b65b5cf852791779bbcedd2ca0231c82ee14f9` from `main`, with `frontend` as the root directory and the verified Studionet address above. The live application returned HTTP 200, reconstructed workflow `firstfault-demo-20260905-1` from the successful create transaction, and displayed a recoverable `Workflow could not be read` state for a nonexistent workflow. Machine-readable web evidence is recorded in `deployments/vercel.json`.
 
+## Golden Studionet dispute
+
+Workflow `firstfault-golden-writer-breach-20260905-1` exercised the complete Studionet contract path with three distinct worker accounts and 51 simulated GEN in custody. A fresh wallet-free production read reconstructed the final verdict and all three finalized transfer links; that browser evidence is recorded in `deployments/vercel.json`. Research bound the IANA example-domain source and reported that it contained no audience metric. Writer then invented a claim of 250,000 weekly users, while Publisher reproduced Writer's artifact exactly as its brief required. GenLayer reached `MAJORITY_AGREE` and returned `FIRST_BREACH` at Writer (step index `1`): Research `COMPLIANT`, Writer `MATERIAL_BREACH`, Publisher `COMPLIANT`.
+
+Adjudication transaction [`0x1a785c…717fc9`](https://explorer-studio.genlayer.com/tx/0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9) finalized with three child transfers: 11 to Researcher, 17 refunded to Buyer for Writer's breach, and 23 to Publisher. All children finalized with credited value, the contract balance returned to zero, and `11 + 17 + 23 = 51`. Exact hashes, evidence lineage, consensus votes, readback and transfer proof are recorded in `deployments/studionet-golden-demo.json`.
+
 After confirming the exact wallet, network, source hash, and intended transaction, set the key in the process environment and run:
 
 ```shell
@@ -125,19 +131,23 @@ The resumed receipt must identify the same transaction hash before evidence can 
 | Buyer | Create workflow | `create_workflow` | [`0x058022…fb084`](https://explorer-studio.genlayer.com/tx/0x0580228b6382bf4d75123ff393fb975016c89cf150b6ac7b0026ebc3ce7fb084) | `FINALIZED` / `SUCCESS`, 5/5 validators agreed | `firstfault-demo-20260905-1` is `DRAFT`; actors, briefs, 10/10/10 holds and zero custody read back from contract |
 | Buyer | Repeat an existing workflow ID | `create_workflow` | [`0xa48670…f40b7f`](https://explorer-studio.genlayer.com/tx/0xa486707f0b85c57c334b3cf57e18cb71d86a39b894d05e639f5061314af40b7f) | `FINALIZED` / `ERROR`; rollback `Workflow already exists` | Original workflow remains `DRAFT` and accounting remains unchanged |
 | Reviewer | Inspect the successful workflow from the live app | `get_workflow`, `get_step`, `get_accounting` | Read-only production call tied to [`0x058022…fb084`](https://explorer-studio.genlayer.com/tx/0x0580228b6382bf4d75123ff393fb975016c89cf150b6ac7b0026ebc3ce7fb084) | Vercel deployment of commit `35b65b5` returned HTTP 200 | Live UI reconstructed `DRAFT`, all three workers, briefs, step states, 10/10/10 holds and zero custody |
-| Workers | Submit Research → Writer → Publisher outputs | `submit_step` | Not exercised on Studionet | Covered by Localnet integration tests | `get_step` Studionet evidence pending |
+| Researcher | Submit IANA-backed research | `submit_step` | [`0xbc0e5c…9d488`](https://explorer-studio.genlayer.com/tx/0xbc0e5cae9fc8767020c660fc46cc5c1e58fd01b1b9b22522cc509817d569d488) | `FINALIZED` / `SUCCESS` | Research output and primary-source evidence hash read back as `SUBMITTED` |
+| Writer | Submit unsupported 250,000-user claim | `submit_step` | [`0xe7c7bf…acc69`](https://explorer-studio.genlayer.com/tx/0xe7c7bf6c77329d9f07017c0463187f512275258461c74167a716c66f66facc69) | `FINALIZED` / `SUCCESS` | Writer output binds exactly to the Research output hash |
+| Publisher | Reproduce Writer artifact exactly | `submit_step` | [`0x1bf028…38527`](https://explorer-studio.genlayer.com/tx/0x1bf028a26051ca0e7fcf029ed08204f21d2a49fa51025a9bd5cc069d3ae38527) | `FINALIZED` / `SUCCESS` | Publisher output hash equals Writer output hash; workflow becomes `READY_FOR_REVIEW` |
 | Buyer | Accept completed workflow | `accept_workflow` | Not exercised on Studionet | Covered by Localnet integration tests | Workflow/accounting Studionet evidence pending |
-| Buyer and validators | Dispute and determine first fault | `open_dispute`, `adjudicate` | Not exercised on Studionet | Covered by Localnet consensus tests | Verdict/accounting Studionet evidence pending |
+| Buyer | Open concrete source-backed rejection | `open_dispute` | [`0xe954b0…f26998`](https://explorer-studio.genlayer.com/tx/0xe954b0505fcdf06213ce696905db55a3330edf9404818d9a66add75e94f26998) | `FINALIZED` / `SUCCESS` | Workflow becomes `DISPUTED`; all 51 remains reserved |
+| Buyer and validators | Determine first material breach | `adjudicate` | [`0x1a785c…717fc9`](https://explorer-studio.genlayer.com/tx/0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9) | `FINALIZED` / `SUCCESS`; 3 agree, 1 disagree, 1 idle | `FIRST_BREACH`, step `1`; 34 payout + 17 refund scheduled, reserved 0 |
+| Contract | Execute adjudication value consequence | Triggered external transfers | [`17 refund`](https://explorer-studio.genlayer.com/tx/0xb47500b7b0d1c819d5522e4384434be9dce304f39c947e43ca34b6e0784e326d), [`11 payout`](https://explorer-studio.genlayer.com/tx/0xc03a8adb99a2fbeed8d924c19b3acebd89a925dec1c071366e2df4ba9fff1304), [`23 payout`](https://explorer-studio.genlayer.com/tx/0xb01ae878c44e5a257f6c9764a0273473fba6945b1b9bb221788986109bfda1d5) | All `FINALIZED`, value credited | Exact recipients and values total 51; contract balance reads 0 |
 | Any caller after timeout | Preserve custody safely | `timeout_dispute_to_unresolved` | Not exercised on Studionet | Covered by direct and Localnet tests | `UNRESOLVED` Studionet evidence pending |
 
-Machine-readable deployment and exercised-flow evidence is recorded in `deployments/studionet.json`, `deployments/studionet-evidence.json`, and `deployments/vercel.json`.
+Machine-readable deployment and exercised-flow evidence is recorded in `deployments/studionet.json`, `deployments/studionet-evidence.json`, `deployments/studionet-golden-demo.json`, and `deployments/vercel.json`.
 
 ## Known limitations
 
 - V1 is frozen; replacing faulty behavior requires a separately deployed and reviewed successor. Existing holds cannot be silently migrated.
 - `UNRESOLVED` deliberately retains reserved value until a contract-governed recovery path succeeds.
 - Localnet and Studionet activity demonstrates development behavior, not production-value settlement.
-- Studionet proof transactions for the remaining settlement, dispute, and `UNRESOLVED` flows are still pending; the live application, create transaction, duplicate-rejection transaction, production readback, and production read-error state are already exercised and verified.
+- The all-compliant `accept_workflow` path and timed `UNRESOLVED` recovery path remain covered by direct and Localnet integration tests rather than separate Studionet proof transactions. The complete Writer-breach dispute and its three finalized value transfers are exercised on Studionet.
 
 ## License
 

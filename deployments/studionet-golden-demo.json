@@ -1,0 +1,236 @@
+{
+  "schemaVersion": 1,
+  "project": "FirstFault",
+  "network": "studionet",
+  "chainId": 61999,
+  "contractAddress": "0x2271AE904A97865491e4b24c49532f71B711eD5f",
+  "contractSourceCommit": "5ef8accf3f19bac356f73f31610aed8f95e47050",
+  "observedAt": "2026-09-05T16:24:32.000Z",
+  "workflowId": "firstfault-golden-writer-breach-20260905-1",
+  "scenario": "A Writer invents a weekly-user metric absent from the bound IANA source; Publisher reproduces it exactly as required.",
+  "actors": {
+    "buyer": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "orchestrator": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "researcher": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "writer": "0x5d39d3243F7372d08ae83983f1Eb8663d121435A",
+    "publisher": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2"
+  },
+  "transactions": {
+    "createWorkflow": {
+      "transactionHash": "0x72782c90d7cda12d592eef3f5925b5a563ec21e4b3d3832bcbb155f741cb0eef",
+      "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "method": "create_workflow",
+      "value": "0",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS"
+    },
+    "fundWorkflow": {
+      "transactionHash": "0xce9e79c68205826a9e57c010fd68cffdcdcc59f04ea4c11eca9421ee3377fa04",
+      "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "method": "fund_workflow",
+      "value": "51",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS"
+    },
+    "startWorkflow": {
+      "transactionHash": "0x1efcbc5a863e8ed85e7a42132258a8c56655a89e287375c1901464d96bf85f52",
+      "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "method": "start_workflow",
+      "value": "0",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS"
+    },
+    "submitResearch": {
+      "transactionHash": "0xbc0e5cae9fc8767020c660fc46cc5c1e58fd01b1b9b22522cc509817d569d488",
+      "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "method": "submit_step",
+      "value": "0",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS"
+    },
+    "submitWriter": {
+      "transactionHash": "0xe7c7bf6c77329d9f07017c0463187f512275258461c74167a716c66f66facc69",
+      "from": "0x5d39d3243F7372d08ae83983f1Eb8663d121435A",
+      "method": "submit_step",
+      "value": "0",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS"
+    },
+    "submitPublisher": {
+      "transactionHash": "0x1bf028a26051ca0e7fcf029ed08204f21d2a49fa51025a9bd5cc069d3ae38527",
+      "from": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2",
+      "method": "submit_step",
+      "value": "0",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS"
+    },
+    "openDispute": {
+      "transactionHash": "0xe954b0505fcdf06213ce696905db55a3330edf9404818d9a66add75e94f26998",
+      "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "method": "open_dispute",
+      "value": "0",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS"
+    },
+    "adjudicate": {
+      "transactionHash": "0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9",
+      "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "method": "adjudicate",
+      "value": "0",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS"
+    }
+  },
+  "evidence": [
+    {
+      "step": 0,
+      "role": "Research",
+      "outputHash": "1bc26ab9f8da5593f3b7c39305db3c9d2ebb0b333a641d33bf48a8cd8d2d31ba",
+      "evidenceHash": "90dc10084313f9f2273e2997dd839fb978195b7a652c496c1229906b54c42a41",
+      "upstreamHash": "",
+      "sourceUrl": "https://www.iana.org/help/example-domains"
+    },
+    {
+      "step": 1,
+      "role": "Writer",
+      "outputHash": "d9a9e1252c212666559ce0566ac712924aa768b9ca3dbde67349b2dc8362651e",
+      "evidenceHash": "0ab9c12026a2f43b9913c9d53e3d036df43111ef79bad7b325b642fddb7ce98b",
+      "upstreamHash": "1bc26ab9f8da5593f3b7c39305db3c9d2ebb0b333a641d33bf48a8cd8d2d31ba",
+      "sourceUrl": ""
+    },
+    {
+      "step": 2,
+      "role": "Publisher",
+      "outputHash": "d9a9e1252c212666559ce0566ac712924aa768b9ca3dbde67349b2dc8362651e",
+      "evidenceHash": "10c07108b148b14c4ba214c4ff5ecdf1d241373186eeac45446f76bfe40df090",
+      "upstreamHash": "d9a9e1252c212666559ce0566ac712924aa768b9ca3dbde67349b2dc8362651e",
+      "sourceUrl": ""
+    }
+  ],
+  "consensus": {
+    "result": "MAJORITY_AGREE",
+    "validators": 5,
+    "agree": 3,
+    "disagree": 1,
+    "idle": 1
+  },
+  "readback": {
+    "state": "DECISION_PENDING_FINALITY",
+    "outcome": "FIRST_BREACH",
+    "firstBreachStep": 1,
+    "stepStatuses": [
+      "COMPLIANT",
+      "MATERIAL_BREACH",
+      "COMPLIANT"
+    ],
+    "citedEvidenceHashes": [
+      "90dc10084313f9f2273e2997dd839fb978195b7a652c496c1229906b54c42a41",
+      "0ab9c12026a2f43b9913c9d53e3d036df43111ef79bad7b325b642fddb7ce98b",
+      "10c07108b148b14c4ba214c4ff5ecdf1d241373186eeac45446f76bfe40df090"
+    ],
+    "stepStates": [
+      "PAYOUT_SCHEDULED",
+      "REFUND_SCHEDULED",
+      "PAYOUT_SCHEDULED"
+    ],
+    "accounting": {
+      "deposited": "51",
+      "reserved": "0",
+      "payoutScheduled": "34",
+      "refundScheduled": "17",
+      "paid": "0",
+      "refunded": "0"
+    }
+  },
+  "transfers": [
+    {
+      "transactionHash": "0xb47500b7b0d1c819d5522e4384434be9dce304f39c947e43ca34b6e0784e326d",
+      "from": "0x2271AE904A97865491e4b24c49532f71B711eD5f",
+      "to": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "value": "17",
+      "purpose": "Writer breach refund to Buyer",
+      "status": "FINALIZED",
+      "valueCredited": true,
+      "triggeredBy": "0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9"
+    },
+    {
+      "transactionHash": "0xc03a8adb99a2fbeed8d924c19b3acebd89a925dec1c071366e2df4ba9fff1304",
+      "from": "0x2271AE904A97865491e4b24c49532f71B711eD5f",
+      "to": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "value": "11",
+      "purpose": "Researcher payout",
+      "status": "FINALIZED",
+      "valueCredited": true,
+      "triggeredBy": "0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9"
+    },
+    {
+      "transactionHash": "0xb01ae878c44e5a257f6c9764a0273473fba6945b1b9bb221788986109bfda1d5",
+      "from": "0x2271AE904A97865491e4b24c49532f71B711eD5f",
+      "to": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2",
+      "value": "23",
+      "purpose": "Publisher payout",
+      "status": "FINALIZED",
+      "valueCredited": true,
+      "triggeredBy": "0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9"
+    }
+  ],
+  "conservation": {
+    "deposited": "51",
+    "scheduled": "51",
+    "finalizedTransfers": "51",
+    "contractBalanceAfterFinalization": "0"
+  },
+  "snapshots": {
+    "beforeFunding": {
+      "anchoredAfterTransaction": "0x72782c90d7cda12d592eef3f5925b5a563ec21e4b3d3832bcbb155f741cb0eef",
+      "workflowState": "DRAFT",
+      "stepStates": ["PENDING", "PENDING", "PENDING"],
+      "stepAmounts": ["11", "17", "23"],
+      "deposited": "0",
+      "reserved": "0",
+      "payoutScheduled": "0",
+      "refundScheduled": "0",
+      "contractBalance": "0"
+    },
+    "beforeAdjudication": {
+      "anchoredAfterTransaction": "0xe954b0505fcdf06213ce696905db55a3330edf9404818d9a66add75e94f26998",
+      "workflowState": "DISPUTED",
+      "stepStates": ["SUBMITTED", "SUBMITTED", "SUBMITTED"],
+      "deposited": "51",
+      "reserved": "51",
+      "payoutScheduled": "0",
+      "refundScheduled": "0",
+      "contractBalance": "51"
+    },
+    "afterChildFinality": {
+      "anchoredAfterTransaction": "0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9",
+      "finalizedChildAnchors": [
+        "0xb47500b7b0d1c819d5522e4384434be9dce304f39c947e43ca34b6e0784e326d",
+        "0xc03a8adb99a2fbeed8d924c19b3acebd89a925dec1c071366e2df4ba9fff1304",
+        "0xb01ae878c44e5a257f6c9764a0273473fba6945b1b9bb221788986109bfda1d5"
+      ],
+      "workflowState": "DECISION_PENDING_FINALITY",
+      "stepStates": ["PAYOUT_SCHEDULED", "REFUND_SCHEDULED", "PAYOUT_SCHEDULED"],
+      "deposited": "51",
+      "reserved": "0",
+      "payoutScheduled": "34",
+      "refundScheduled": "17",
+      "contractBalance": "0"
+    }
+  },
+  "productionReadback": {
+    "url": "https://firstfault.vercel.app",
+    "deploymentCommit": "35b65b5cf852791779bbcedd2ca0231c82ee14f9",
+    "observedAt": "2026-09-05T16:26:43.000Z",
+    "walletRequired": false,
+    "workflowState": "DECISION_PENDING_FINALITY",
+    "outcome": "FIRST_BREACH",
+    "transferProofLabel": "Transfers finalized",
+    "parentTransactionHash": "0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9",
+    "childTransactionHashes": [
+      "0xb47500b7b0d1c819d5522e4384434be9dce304f39c947e43ca34b6e0784e326d",
+      "0xc03a8adb99a2fbeed8d924c19b3acebd89a925dec1c071366e2df4ba9fff1304",
+      "0xb01ae878c44e5a257f6c9764a0273473fba6945b1b9bb221788986109bfda1d5"
+    ]
+  }
+}

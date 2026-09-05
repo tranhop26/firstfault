@@ -13,7 +13,7 @@
     "NEXT_PUBLIC_GENLAYER_CHAIN_ID": "61999",
     "NEXT_PUBLIC_CONTRACT_ADDRESS": "0x2271AE904A97865491e4b24c49532f71B711eD5f"
   },
-  "verifiedAt": "2026-09-05T15:33:58.5032440Z",
+  "verifiedAt": "2026-09-05T16:26:43.000Z",
   "http": {
     "status": 200,
     "containsProjectTitle": true
@@ -32,6 +32,22 @@
       "workflowId": "missing-vercel-proof-20260905",
       "uiState": "Workflow could not be read",
       "retryOffered": true
+    },
+    "goldenDisputeReadback": {
+      "workflowId": "firstfault-golden-writer-breach-20260905-1",
+      "state": "DECISION_PENDING_FINALITY",
+      "outcome": "FIRST_BREACH",
+      "firstBreachStep": 1,
+      "stepStatuses": ["COMPLIANT", "MATERIAL_BREACH", "COMPLIANT"],
+      "transferProof": "Transfers finalized",
+      "parentTransactionHash": "0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9",
+      "childTransactionHashes": [
+        "0xb47500b7b0d1c819d5522e4384434be9dce304f39c947e43ca34b6e0784e326d",
+        "0xc03a8adb99a2fbeed8d924c19b3acebd89a925dec1c071366e2df4ba9fff1304",
+        "0xb01ae878c44e5a257f6c9764a0273473fba6945b1b9bb221788986109bfda1d5"
+      ],
+      "readWithoutWallet": true,
+      "observedAt": "2026-09-05T16:26:43.000Z"
     }
   }
 }
