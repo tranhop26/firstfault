@@ -51,4 +51,20 @@ describe("FirstFault truthful interface", () => {
     expect(screen.getByText("Unresolved — funds held")).toBeTruthy();
     expect(screen.getByText(/remains reserved/i)).toBeTruthy();
   });
+
+  it("links transaction evidence to the canonical Studionet explorer", () => {
+    const parentHash = `0x${"a".repeat(64)}`;
+    const childHash = `0x${"b".repeat(64)}`;
+    render(
+      <TransactionStatus
+        status={{ phase: "SUCCESS", label: "Finalized", detail: "Contract readback confirmed." }}
+        parentHash={parentHash}
+        childHashes={[childHash]}
+      />,
+    );
+    expect(screen.getByRole("link", { name: /parent transaction/i }).getAttribute("href"))
+      .toBe(`https://explorer-studio.genlayer.com/tx/${parentHash}`);
+    expect(screen.getByRole("link", { name: /transfer 1/i }).getAttribute("href"))
+      .toBe(`https://explorer-studio.genlayer.com/tx/${childHash}`);
+  });
 });

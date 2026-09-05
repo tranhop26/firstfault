@@ -1,6 +1,6 @@
 import type { ProjectedStatus } from "@/lib/firstfault/status";
 
-const explorer = "https://genlayer-explorer.vercel.app/transactions";
+const explorer = "https://explorer-studio.genlayer.com/tx";
 
 export function TransactionStatus({ status, parentHash, childHashes }: { status: ProjectedStatus; parentHash: string | null; childHashes: string[] }) {
   const tone = status.phase === "ERROR" ? "danger" : status.phase === "SUCCESS" ? "success" : status.phase === "UNRESOLVED" ? "warning" : "info";

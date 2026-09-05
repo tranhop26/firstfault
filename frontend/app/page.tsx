@@ -101,7 +101,7 @@ export default function HomePage() {
           </>}
         </div>
       </main>
-      <footer><div className="ff-shell"><div className="ff-footer-brand"><div className="ff-logo"><span className="ff-logo-mark">F</span><span>FirstFault</span></div><AgentTankBadge compact /></div><p>Built for Agent Tank · Powered by GenLayer Studionet<br/>Intentionally frozen contract · simulated Studionet value</p><div><a href="https://genlayer.com" target="_blank" rel="noreferrer">GenLayer</a><a href="https://genlayer-explorer.vercel.app" target="_blank" rel="noreferrer">Explorer</a></div></div></footer>
+      <footer><div className="ff-shell"><div className="ff-footer-brand"><div className="ff-logo"><span className="ff-logo-mark">F</span><span>FirstFault</span></div><AgentTankBadge compact /></div><p>Built for Agent Tank · Powered by GenLayer Studionet<br/>Intentionally frozen contract · simulated Studionet value</p><div><a href="https://genlayer.com" target="_blank" rel="noreferrer">GenLayer</a><a href="https://explorer-studio.genlayer.com" target="_blank" rel="noreferrer">Explorer</a></div></div></footer>
     </div>
   );
 }

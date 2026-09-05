@@ -9,6 +9,7 @@
 *.sln
 *.sw?
 .env
+.env*.local
 node_modules
 # Python bytecode
 __pycache__/
@@ -16,7 +17,7 @@ __pycache__/
 *.pyo
 *.pyd
 /context
-/\.superpowers/sdd/
+/.superpowers/
 /.worktrees/
 /frontend/.next
 /frontend/next-env.d.ts

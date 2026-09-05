@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "project": "FirstFault",
+  "network": "studionet",
+  "chainId": 61999,
+  "contractAddress": "0x2271AE904A97865491e4b24c49532f71B711eD5f",
+  "contractSourceCommit": "5ef8accf3f19bac356f73f31610aed8f95e47050",
+  "observedAt": "2026-09-05T12:34:46.7048016Z",
+  "workflowId": "firstfault-demo-20260905-1",
+  "successfulCreate": {
+    "transactionHash": "0x0580228b6382bf4d75123ff393fb975016c89cf150b6ac7b0026ebc3ce7fb084",
+    "status": "FINALIZED",
+    "executionResult": "SUCCESS",
+    "validatorVotes": {
+      "agree": 5,
+      "disagree": 0
+    },
+    "readback": {
+      "state": "DRAFT",
+      "buyer": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "orchestrator": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "deposited": "0",
+      "reserved": "0",
+      "stepStates": [
+        "PENDING",
+        "PENDING",
+        "PENDING"
+      ],
+      "stepAmounts": [
+        "10",
+        "10",
+        "10"
+      ]
+    }
+  },
+  "rejectedDuplicate": {
+    "transactionHash": "0xa486707f0b85c57c334b3cf57e18cb71d86a39b894d05e639f5061314af40b7f",
+    "status": "FINALIZED",
+    "executionResult": "ERROR",
+    "rollbackPayload": "Workflow already exists",
+    "postFailureReadbackState": "DRAFT"
+  }
+}
