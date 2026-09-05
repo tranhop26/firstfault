@@ -7,13 +7,14 @@ import { createWalletClient, custom, type WalletClient } from "viem";
 // Studionet is the single source for chain metadata used by wallet and contract clients.
 export const GENLAYER_CHAIN_ID = studionet.id;
 export const GENLAYER_CHAIN_ID_HEX = `0x${GENLAYER_CHAIN_ID.toString(16).toUpperCase()}`;
+export const GENLAYER_EXPLORER_URL = "https://explorer-studio.genlayer.com";
 
 export const GENLAYER_NETWORK = {
   chainId: GENLAYER_CHAIN_ID_HEX,
   chainName: studionet.name,
   nativeCurrency: studionet.nativeCurrency,
   rpcUrls: [...studionet.rpcUrls.default.http],
-  blockExplorerUrls: [studionet.blockExplorers.default.url],
+  blockExplorerUrls: [GENLAYER_EXPLORER_URL],
 };
 
 // Ethereum provider type from window

@@ -122,7 +122,6 @@ export default class FirstFault {
   private async write(functionName: string, args: unknown[], value = 0n) {
     if (!this.account) throw new Error("A connected account is required");
     const hash = await this.client.writeContract({
-      account: this.account,
       address: this.contractAddress,
       functionName,
       args: args as never[],
