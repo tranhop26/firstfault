@@ -6,14 +6,14 @@
   "repository": "https://github.com/tranhop26/firstfault",
   "branch": "main",
   "rootDirectory": "frontend",
-  "deploymentCommit": "35b65b5cf852791779bbcedd2ca0231c82ee14f9",
+  "deploymentCommit": "f38ea60c3a3a3fde38126c5116c53b88c970518b",
   "url": "https://firstfault.vercel.app",
   "environment": {
     "NEXT_PUBLIC_GENLAYER_RPC_URL": "https://studio.genlayer.com/api",
     "NEXT_PUBLIC_GENLAYER_CHAIN_ID": "61999",
     "NEXT_PUBLIC_CONTRACT_ADDRESS": "0x2271AE904A97865491e4b24c49532f71B711eD5f"
   },
-  "verifiedAt": "2026-09-05T16:26:43.000Z",
+  "verifiedAt": "2026-09-05T23:58:31.764Z",
   "http": {
     "status": 200,
     "containsProjectTitle": true
@@ -48,6 +48,36 @@
       ],
       "readWithoutWallet": true,
       "observedAt": "2026-09-05T16:26:43.000Z"
+    },
+    "acceptAllReadback": {
+      "workflowId": "firstfault-live-accept-20260905-1",
+      "state": "ACCEPTED_PENDING_FINALITY",
+      "deposited": "3",
+      "reserved": "0",
+      "payoutScheduled": "3",
+      "transferProof": "Transfers finalized",
+      "parentTransactionHash": "0x49a65263371e25c2b3cc40ce44d11c564a1d650b030ddf09ba9788839b33ba23",
+      "childTransactionHashes": [
+        "0x23b1d7065ed84e570e9c16b5ac5ba88c91d1cb200f9cabf625385a9253285c0f",
+        "0x386cbc3588c147ae194ebe089a28b994be491786afbb40fe845d324a6867ca96",
+        "0x0a5f40c761490b72de76f6fcf6fe009c4c4fcebab7c2777499490e0f6c78c9a5"
+      ],
+      "readWithoutWallet": true,
+      "observedAt": "2026-09-05T23:58:31.764Z"
+    },
+    "unresolvedReadback": {
+      "workflowId": "firstfault-live-unresolved-20260905-1",
+      "state": "UNRESOLVED",
+      "outcome": "UNRESOLVED",
+      "reason": "CONSENSUS_TIMEOUT",
+      "deposited": "3",
+      "reserved": "3",
+      "payoutScheduled": "0",
+      "refundScheduled": "0",
+      "statusLabel": "Unresolved — funds held",
+      "timeoutTransactionHash": "0xdf2b9f74f65b9e59678ecd9bcdb2594fe9d9fb3409b59dbe1f433bef4d6985e2",
+      "readWithoutWallet": true,
+      "observedAt": "2026-09-05T23:58:31.764Z"
     }
   }
 }

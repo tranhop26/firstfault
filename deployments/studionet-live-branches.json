@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "project": "FirstFault",
+  "network": "studionet",
+  "chainId": 61999,
+  "contractAddress": "0x2271AE904A97865491e4b24c49532f71B711eD5f",
+  "contractSourceCommit": "5ef8accf3f19bac356f73f31610aed8f95e47050",
+  "observedAt": "2026-09-05T23:58:31.764Z",
+  "actors": {
+    "buyer": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "researcher": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "writer": "0x5d39d3243F7372d08ae83983f1Eb8663d121435A",
+    "publisher": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2"
+  },
+  "acceptAll": {
+    "workflowId": "firstfault-live-accept-20260905-1",
+    "transactions": {
+      "createWorkflow": { "transactionHash": "0xbfc77442f6e97702219624292e5385bc359c12a3e3c88dab8bf39613e7cb52e7", "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7", "method": "create_workflow", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "fundWorkflow": { "transactionHash": "0xfc7bfe9321fc17f108deaab41d3419eb8729eecfeed1f5913bff339dca0f02ad", "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7", "method": "fund_workflow", "value": "3", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "startWorkflow": { "transactionHash": "0xa3ee23deb0fa0d38ad97db3588277642f352630d503a884b75c481b8b05260dc", "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7", "method": "start_workflow", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "submitResearch": { "transactionHash": "0xb16cc07c9f5d6434059f17fd28b7f42b5791da923f783add7c94dfe6218bfc04", "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7", "method": "submit_step", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "submitWriter": { "transactionHash": "0x273bdc99e7370d066e697a401f230239d8036dfbe5af68a2f06bcf0a391a66ac", "from": "0x5d39d3243F7372d08ae83983f1Eb8663d121435A", "method": "submit_step", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "submitPublisher": { "transactionHash": "0x86b65ec3b52cdcbd07e76bbef45127a805face4bfb3ecaf4d2b314d1c16198cd", "from": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2", "method": "submit_step", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "acceptWorkflow": { "transactionHash": "0x49a65263371e25c2b3cc40ce44d11c564a1d650b030ddf09ba9788839b33ba23", "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7", "method": "accept_workflow", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" }
+    },
+    "evidence": [
+      { "step": 0, "outputHash": "1bc26ab9f8da5593f3b7c39305db3c9d2ebb0b333a641d33bf48a8cd8d2d31ba", "evidenceHash": "e83e9f75c35467751be9d03c65ba5a7dbb7282def47b8b6510939e6484d00618", "upstreamHash": "" },
+      { "step": 1, "outputHash": "477b26f0e49da8d29e7f0d6e046a4abbf81624164df68532827fab9d52feb4b7", "evidenceHash": "26fd270aa0d232695ffbca0ebcb1ec7c9575f9a1589ed2f2e91b306c07e145f9", "upstreamHash": "1bc26ab9f8da5593f3b7c39305db3c9d2ebb0b333a641d33bf48a8cd8d2d31ba" },
+      { "step": 2, "outputHash": "477b26f0e49da8d29e7f0d6e046a4abbf81624164df68532827fab9d52feb4b7", "evidenceHash": "fab057dd56ddebbd5a4c303e41ed78583e3ebb1490e9b6d5705a4762cd00c99a", "upstreamHash": "477b26f0e49da8d29e7f0d6e046a4abbf81624164df68532827fab9d52feb4b7" }
+    ],
+    "readback": {
+      "state": "ACCEPTED_PENDING_FINALITY",
+      "outcome": "ACCEPTED_PENDING_FINALITY",
+      "deposited": "3",
+      "reserved": "0",
+      "payoutScheduled": "3",
+      "refundScheduled": "0",
+      "paid": "0",
+      "refunded": "0"
+    },
+    "transfers": [
+      { "transactionHash": "0x23b1d7065ed84e570e9c16b5ac5ba88c91d1cb200f9cabf625385a9253285c0f", "from": "0x2271AE904A97865491e4b24c49532f71B711eD5f", "to": "0x21b45103dd05c43969daF3CbB4277391777e2eC7", "value": "1", "status": "FINALIZED", "valueCredited": true, "triggeredBy": "0x49a65263371e25c2b3cc40ce44d11c564a1d650b030ddf09ba9788839b33ba23" },
+      { "transactionHash": "0x386cbc3588c147ae194ebe089a28b994be491786afbb40fe845d324a6867ca96", "from": "0x2271AE904A97865491e4b24c49532f71B711eD5f", "to": "0x5d39d3243F7372d08ae83983f1Eb8663d121435A", "value": "1", "status": "FINALIZED", "valueCredited": true, "triggeredBy": "0x49a65263371e25c2b3cc40ce44d11c564a1d650b030ddf09ba9788839b33ba23" },
+      { "transactionHash": "0x0a5f40c761490b72de76f6fcf6fe009c4c4fcebab7c2777499490e0f6c78c9a5", "from": "0x2271AE904A97865491e4b24c49532f71B711eD5f", "to": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2", "value": "1", "status": "FINALIZED", "valueCredited": true, "triggeredBy": "0x49a65263371e25c2b3cc40ce44d11c564a1d650b030ddf09ba9788839b33ba23" }
+    ],
+    "productionReadback": {
+      "url": "https://firstfault.vercel.app",
+      "deploymentCommit": "f38ea60c3a3a3fde38126c5116c53b88c970518b",
+      "workflowState": "ACCEPTED_PENDING_FINALITY",
+      "transferProofLabel": "Transfers finalized",
+      "readWithoutWallet": true,
+      "observedAt": "2026-09-05T23:58:31.764Z"
+    }
+  },
+  "unresolved": {
+    "workflowId": "firstfault-live-unresolved-20260905-1",
+    "transactions": {
+      "createWorkflow": { "transactionHash": "0xcb4e70bac60ea087b02c0b8bfb2e47859617563c7c7850a22f3d8add1acfcb8a", "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7", "method": "create_workflow", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "fundWorkflow": { "transactionHash": "0x08eb14d18a9531c7935910e5d39e42e84212ed2fdceb820936098925fbf23d1b", "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7", "method": "fund_workflow", "value": "3", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "startWorkflow": { "transactionHash": "0x3c6a6f58c4df2d0b6d99657fa3fa461b951003d247042cccf7ab600a192a413d", "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7", "method": "start_workflow", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "submitResearch": { "transactionHash": "0xad5d475b7c2cb1b041114a5ae12c0e91f11150855fb2f9dbe47930727048f1b0", "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7", "method": "submit_step", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "submitWriter": { "transactionHash": "0xec697932f41f7c6f9d0169281f8256268635cc5b49de1aa718dc38e958c11b97", "from": "0x5d39d3243F7372d08ae83983f1Eb8663d121435A", "method": "submit_step", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "submitPublisher": { "transactionHash": "0xfc4e4c85b6eb4f8695591e049b860db9b02a5c8ca2761abba38325959d1bd1de", "from": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2", "method": "submit_step", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "openDispute": { "transactionHash": "0x3d63d8b24eb20347d0248785d2d5cb514ea6772d59d00a123d7f9f0840cf354f", "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7", "method": "open_dispute", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" },
+      "timeout": { "transactionHash": "0xdf2b9f74f65b9e59678ecd9bcdb2594fe9d9fb3409b59dbe1f433bef4d6985e2", "from": "0x21b45103dd05c43969daF3CbB4277391777e2eC7", "method": "timeout_dispute_to_unresolved", "value": "0", "status": "FINALIZED", "executionResult": "SUCCESS" }
+    },
+    "evidence": [
+      { "step": 0, "outputHash": "1bc26ab9f8da5593f3b7c39305db3c9d2ebb0b333a641d33bf48a8cd8d2d31ba", "evidenceHash": "b67ae87fc28bf8b5b15c1dc5454f552957ac3fbfdef22b96ae980bd9e4c05510", "upstreamHash": "" },
+      { "step": 1, "outputHash": "477b26f0e49da8d29e7f0d6e046a4abbf81624164df68532827fab9d52feb4b7", "evidenceHash": "0672b15a53cf456234ff680f72d7a226c08fe314706e220c5f51cdb4a83ef5cf", "upstreamHash": "1bc26ab9f8da5593f3b7c39305db3c9d2ebb0b333a641d33bf48a8cd8d2d31ba" },
+      { "step": 2, "outputHash": "477b26f0e49da8d29e7f0d6e046a4abbf81624164df68532827fab9d52feb4b7", "evidenceHash": "42ad777c1cb34cb9f1427ae1ab0d736bccc62d8ecdede66864641bd1b76d863f", "upstreamHash": "477b26f0e49da8d29e7f0d6e046a4abbf81624164df68532827fab9d52feb4b7" }
+    ],
+    "readback": {
+      "state": "UNRESOLVED",
+      "outcome": "UNRESOLVED",
+      "reason": "CONSENSUS_TIMEOUT",
+      "stepStatuses": ["UNRESOLVED", "UNRESOLVED", "UNRESOLVED"],
+      "disputeOpenedAt": "1788627858",
+      "deposited": "3",
+      "reserved": "3",
+      "payoutScheduled": "0",
+      "refundScheduled": "0",
+      "paid": "0",
+      "refunded": "0"
+    },
+    "transfers": [],
+    "productionReadback": {
+      "url": "https://firstfault.vercel.app",
+      "deploymentCommit": "f38ea60c3a3a3fde38126c5116c53b88c970518b",
+      "workflowState": "UNRESOLVED",
+      "outcome": "UNRESOLVED",
+      "reason": "CONSENSUS_TIMEOUT",
+      "statusLabel": "Unresolved — funds held",
+      "readWithoutWallet": true,
+      "observedAt": "2026-09-05T23:58:31.764Z"
+    }
+  },
+  "conservation": {
+    "totalDeposited": "6",
+    "finalizedTransfers": "3",
+    "reserved": "3",
+    "contractBalance": "3"
+  }
+}

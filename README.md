@@ -71,7 +71,7 @@ An empty contract address is intentional before deployment. The frontend reports
 
 ```shell
 genvm-lint check contracts/firstfault.py
-pytest tests/direct -q
+python -m pytest tests/direct -q
 npm --prefix frontend test -- --exclude lib/contracts/FirstFault.localnet.test.ts
 npm run verify:deployment
 npm run lint
@@ -106,6 +106,12 @@ Workflow `firstfault-golden-writer-breach-20260905-1` exercised the complete Stu
 
 Adjudication transaction [`0x1a785c…717fc9`](https://explorer-studio.genlayer.com/tx/0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9) finalized with three child transfers: 11 to Researcher, 17 refunded to Buyer for Writer's breach, and 23 to Publisher. All children finalized with credited value, the contract balance returned to zero, and `11 + 17 + 23 = 51`. Exact hashes, evidence lineage, consensus votes, readback and transfer proof are recorded in `deployments/studionet-golden-demo.json`.
 
+## Live accept-all and UNRESOLVED branches
+
+Two additional three-wallet workflows exercise the remaining promoted branches with 1/1/1 simulated GEN holds. [`firstfault-live-accept-20260905-1`](https://explorer-studio.genlayer.com/tx/0x49a65263371e25c2b3cc40ce44d11c564a1d650b030ddf09ba9788839b33ba23) accepted all work and triggered three finalized, value-credited transfers of 1 GEN to Researcher, Writer and Publisher. [`firstfault-live-unresolved-20260905-1`](https://explorer-studio.genlayer.com/tx/0xdf2b9f74f65b9e59678ecd9bcdb2594fe9d9fb3409b59dbe1f433bef4d6985e2) timed out after the contract-enforced 3,600-second recovery delay and finalized as `UNRESOLVED / CONSENSUS_TIMEOUT`; all 3 GEN remain reserved and no transfer was scheduled.
+
+Fresh production reads reconstructed both branches. Across them, custody conserves exactly: `6 deposited = 3 finalized transfers + 3 reserved`, while the contract balance is 3. Exact action transactions, evidence lineage, child-transfer proof, terminal readbacks and conservation are fixed in `deployments/studionet-live-branches.json`.
+
 After confirming the exact wallet, network, source hash, and intended transaction, set the key in the process environment and run:
 
 ```shell
@@ -134,20 +140,21 @@ The resumed receipt must identify the same transaction hash before evidence can 
 | Researcher | Submit IANA-backed research | `submit_step` | [`0xbc0e5c…9d488`](https://explorer-studio.genlayer.com/tx/0xbc0e5cae9fc8767020c660fc46cc5c1e58fd01b1b9b22522cc509817d569d488) | `FINALIZED` / `SUCCESS` | Research output and primary-source evidence hash read back as `SUBMITTED` |
 | Writer | Submit unsupported 250,000-user claim | `submit_step` | [`0xe7c7bf…acc69`](https://explorer-studio.genlayer.com/tx/0xe7c7bf6c77329d9f07017c0463187f512275258461c74167a716c66f66facc69) | `FINALIZED` / `SUCCESS` | Writer output binds exactly to the Research output hash |
 | Publisher | Reproduce Writer artifact exactly | `submit_step` | [`0x1bf028…38527`](https://explorer-studio.genlayer.com/tx/0x1bf028a26051ca0e7fcf029ed08204f21d2a49fa51025a9bd5cc069d3ae38527) | `FINALIZED` / `SUCCESS` | Publisher output hash equals Writer output hash; workflow becomes `READY_FOR_REVIEW` |
-| Buyer | Accept completed workflow | `accept_workflow` | Not exercised on Studionet | Covered by Localnet integration tests | Workflow/accounting Studionet evidence pending |
+| Buyer | Accept completed workflow | `accept_workflow` | [`0x49a652…33ba23`](https://explorer-studio.genlayer.com/tx/0x49a65263371e25c2b3cc40ce44d11c564a1d650b030ddf09ba9788839b33ba23) | `FINALIZED` / `SUCCESS` | 3 payout scheduled, reserved 0; three value-credited child transfers finalized |
+| Contract | Execute accept-all payouts | Triggered external transfers | [`Researcher`](https://explorer-studio.genlayer.com/tx/0x23b1d7065ed84e570e9c16b5ac5ba88c91d1cb200f9cabf625385a9253285c0f), [`Writer`](https://explorer-studio.genlayer.com/tx/0x386cbc3588c147ae194ebe089a28b994be491786afbb40fe845d324a6867ca96), [`Publisher`](https://explorer-studio.genlayer.com/tx/0x0a5f40c761490b72de76f6fcf6fe009c4c4fcebab7c2777499490e0f6c78c9a5) | All `FINALIZED`, value credited | Exact stored recipients receive 1 simulated GEN each |
 | Buyer | Open concrete source-backed rejection | `open_dispute` | [`0xe954b0…f26998`](https://explorer-studio.genlayer.com/tx/0xe954b0505fcdf06213ce696905db55a3330edf9404818d9a66add75e94f26998) | `FINALIZED` / `SUCCESS` | Workflow becomes `DISPUTED`; all 51 remains reserved |
 | Buyer and validators | Determine first material breach | `adjudicate` | [`0x1a785c…717fc9`](https://explorer-studio.genlayer.com/tx/0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9) | `FINALIZED` / `SUCCESS`; 3 agree, 1 disagree, 1 idle | `FIRST_BREACH`, step `1`; 34 payout + 17 refund scheduled, reserved 0 |
 | Contract | Execute adjudication value consequence | Triggered external transfers | [`17 refund`](https://explorer-studio.genlayer.com/tx/0xb47500b7b0d1c819d5522e4384434be9dce304f39c947e43ca34b6e0784e326d), [`11 payout`](https://explorer-studio.genlayer.com/tx/0xc03a8adb99a2fbeed8d924c19b3acebd89a925dec1c071366e2df4ba9fff1304), [`23 payout`](https://explorer-studio.genlayer.com/tx/0xb01ae878c44e5a257f6c9764a0273473fba6945b1b9bb221788986109bfda1d5) | All `FINALIZED`, value credited | Exact recipients and values total 51; contract balance reads 0 |
-| Any caller after timeout | Preserve custody safely | `timeout_dispute_to_unresolved` | Not exercised on Studionet | Covered by direct and Localnet tests | `UNRESOLVED` Studionet evidence pending |
+| Buyer after timeout | Preserve custody safely | `timeout_dispute_to_unresolved` | [`0xdf2b9f…6985e2`](https://explorer-studio.genlayer.com/tx/0xdf2b9f74f65b9e59678ecd9bcdb2594fe9d9fb3409b59dbe1f433bef4d6985e2) | `FINALIZED` / `SUCCESS` | `UNRESOLVED / CONSENSUS_TIMEOUT`; all 3 remains reserved, no payout/refund |
 
-Machine-readable deployment and exercised-flow evidence is recorded in `deployments/studionet.json`, `deployments/studionet-evidence.json`, `deployments/studionet-golden-demo.json`, and `deployments/vercel.json`.
+Machine-readable deployment and exercised-flow evidence is recorded in `deployments/studionet.json`, `deployments/studionet-evidence.json`, `deployments/studionet-golden-demo.json`, `deployments/studionet-live-branches.json`, and `deployments/vercel.json`.
 
 ## Known limitations
 
 - V1 is frozen; replacing faulty behavior requires a separately deployed and reviewed successor. Existing holds cannot be silently migrated.
 - `UNRESOLVED` deliberately retains reserved value until a contract-governed recovery path succeeds.
 - Localnet and Studionet activity demonstrates development behavior, not production-value settlement.
-- The all-compliant `accept_workflow` path and timed `UNRESOLVED` recovery path remain covered by direct and Localnet integration tests rather than separate Studionet proof transactions. The complete Writer-breach dispute and its three finalized value transfers are exercised on Studionet.
+- Contract accounting deliberately distinguishes scheduled value from external transfer finality. `paid` and `refunded` remain zero in V1; finalized child receipts with `valueCredited=true` are the execution proof, while the contract ledger records the exact scheduled amounts and recipients.
 
 ## License
 
