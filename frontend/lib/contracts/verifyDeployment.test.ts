@@ -1,25 +1,118 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
-import { verifyDeploymentReceipt } from "../../../scripts/verifyDeployment";
+import {
+  EXPECTED_FIRSTFAULT_METHODS,
+  assertPrivateKey,
+  verifySourceAndSchema,
+} from "../../../scripts/deploymentEvidence";
+import {
+  verifyDeploymentReceipt,
+  verifyLiveDeployment,
+} from "../../../scripts/verifyDeployment";
+
+const ADDRESS = "0x1111111111111111111111111111111111111111" as const;
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const SOURCE = "class FirstFault: pass\n";
+
+function validSchema() {
+  return {
+    methods: Object.fromEntries(
+      EXPECTED_FIRSTFAULT_METHODS.map((name) => [name, { readonly: false }]),
+    ),
+  };
+}
 
 describe("deployment receipt verification", () => {
-  test("rejects finalized deployment receipts whose execution failed", () => {
-    expect(() =>
-      verifyDeploymentReceipt({
+  test.each([
+    [
+      {
+        statusName: "ACCEPTED",
+        txExecutionResultName: "FINISHED_WITH_RETURN",
+        to_address: ADDRESS,
+      },
+      "not finalized",
+    ],
+    [
+      {
         statusName: "FINALIZED",
         txExecutionResultName: "FINISHED_WITH_ERROR",
-        to_address: "0x1111111111111111111111111111111111111111",
-      }),
-    ).toThrow("execution failed");
+        to_address: ADDRESS,
+      },
+      "execution failed",
+    ],
+    [
+      {
+        statusName: "FINALIZED",
+        txExecutionResultName: "FINISHED_WITH_RETURN",
+        to_address: ZERO_ADDRESS,
+      },
+      "no contract address",
+    ],
+  ])("rejects an invalid deployment receipt: %s", (receipt, message) => {
+    expect(() =>
+      verifyDeploymentReceipt(receipt),
+    ).toThrow(message);
   });
 
-  test("returns the deployed address only for finalized successful execution", () => {
+  test("returns normalized evidence only for finalized successful execution", () => {
     expect(
       verifyDeploymentReceipt({
         statusName: "FINALIZED",
         txExecutionResultName: "FINISHED_WITH_RETURN",
-        to_address: "0x1111111111111111111111111111111111111111",
+        txDataDecoded: { contractAddress: ADDRESS },
       }),
-    ).toBe("0x1111111111111111111111111111111111111111");
+    ).toEqual({
+      contractAddress: ADDRESS,
+      executionResult: "FINISHED_WITH_RETURN",
+    });
+  });
+
+  test("accepts only a 0x-prefixed 32-byte private key", () => {
+    expect(() => assertPrivateKey(undefined)).toThrow("0x-prefixed 32-byte key");
+    expect(() => assertPrivateKey("0x12")).toThrow("0x-prefixed 32-byte key");
+    expect(() => assertPrivateKey(`0x${"a".repeat(64)}`)).not.toThrow();
+  });
+
+  test("rejects a deployed source mismatch", () => {
+    expect(() =>
+      verifySourceAndSchema(SOURCE, "class Other: pass\n", validSchema()),
+    ).toThrow("source mismatch");
+  });
+
+  test("normalizes Windows line endings before comparing source", () => {
+    const evidence = verifySourceAndSchema(
+      "class FirstFault: pass\r\n",
+      SOURCE,
+      validSchema(),
+    );
+    expect(evidence.sourceSha256).toBe(evidence.deployedSourceSha256);
+  });
+
+  test("rejects missing or additional public methods", () => {
+    const missing = validSchema();
+    delete missing.methods.adjudicate;
+    expect(() => verifySourceAndSchema(SOURCE, SOURCE, missing)).toThrow(
+      "schema mismatch",
+    );
+
+    const additional = validSchema();
+    additional.methods.admin_upgrade = { readonly: false };
+    expect(() => verifySourceAndSchema(SOURCE, SOURCE, additional)).toThrow(
+      "schema mismatch",
+    );
+  });
+
+  test("reads source and schema from the exact finalized address", async () => {
+    const client = {
+      getContractCode: vi.fn().mockResolvedValue(SOURCE),
+      getContractSchema: vi.fn().mockResolvedValue(validSchema()),
+    };
+
+    const result = await verifyLiveDeployment(client, ADDRESS, SOURCE);
+
+    expect(client.getContractCode).toHaveBeenCalledWith(ADDRESS);
+    expect(client.getContractSchema).toHaveBeenCalledWith(ADDRESS);
+    expect(result.sourceSha256).toBe(result.deployedSourceSha256);
+    expect(result.expectedMethods).toEqual(EXPECTED_FIRSTFAULT_METHODS);
   });
 });
