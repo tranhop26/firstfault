@@ -12,6 +12,8 @@ type Address = `0x${string}`;
 export type DeploymentReceiptLike = {
   hash?: string;
   txId?: string;
+  from_address?: string;
+  sender?: string;
   statusName?: string;
   txExecutionResultName?: string;
   to_address?: string;
@@ -38,6 +40,7 @@ export type DeploymentReadClient = {
 export function verifyDeploymentReceipt(
   receipt: DeploymentReceiptLike,
   expectedTransactionHash: `0x${string}`,
+  expectedDeployerAddress?: Address,
 ): VerifiedDeploymentReceipt {
   const receiptHash = receipt.hash ?? receipt.txId;
   if (
@@ -45,6 +48,15 @@ export function verifyDeploymentReceipt(
     receiptHash.toLowerCase() !== expectedTransactionHash.toLowerCase()
   ) {
     throw new Error("Deployment receipt transaction hash mismatch");
+  }
+  if (expectedDeployerAddress) {
+    const receiptSender = receipt.from_address ?? receipt.sender;
+    if (
+      typeof receiptSender !== "string" ||
+      receiptSender.toLowerCase() !== expectedDeployerAddress.toLowerCase()
+    ) {
+      throw new Error("Deployment receipt deployer address mismatch");
+    }
   }
   if (receipt.statusName !== TransactionStatus.FINALIZED) {
     throw new Error("Deployment is not finalized");

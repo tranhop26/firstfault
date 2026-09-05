@@ -37,6 +37,7 @@ function makeHarness(overrides: Partial<DeploymentClient> = {}) {
       calls.push("finalized");
       return {
         hash: TRANSACTION_HASH,
+        from_address: DEPLOYER_ADDRESS,
         statusName: "FINALIZED",
         txExecutionResultName: "FINISHED_WITH_RETURN",
         to_address: CONTRACT_ADDRESS,
@@ -145,6 +146,7 @@ describe("FirstFault Studionet deployment orchestration", () => {
     const { input, writeManifest } = makeHarness({
       waitForTransactionReceipt: vi.fn(async () => ({
         hash: TRANSACTION_HASH,
+        from_address: DEPLOYER_ADDRESS,
         statusName: "FINALIZED",
         txExecutionResultName: "FINISHED_WITH_ERROR",
         to_address: CONTRACT_ADDRESS,
@@ -204,5 +206,23 @@ describe("FirstFault Studionet deployment orchestration", () => {
       "manifest",
     ]);
     expect(result.deploymentTransactionHash).toBe(TRANSACTION_HASH);
+  });
+
+  test("refuses to resume a deployment submitted by another wallet", async () => {
+    const { client, input, writeManifest } = makeHarness({
+      waitForTransactionReceipt: vi.fn(async () => ({
+        hash: TRANSACTION_HASH,
+        from_address: "0x3333333333333333333333333333333333333333",
+        statusName: "FINALIZED",
+        txExecutionResultName: "FINISHED_WITH_RETURN",
+        to_address: CONTRACT_ADDRESS,
+      })),
+    });
+
+    await expect(
+      resumeFirstFaultDeployment(input, TRANSACTION_HASH),
+    ).rejects.toThrow("deployer address mismatch");
+    expect(client.deployContract).not.toHaveBeenCalled();
+    expect(writeManifest).not.toHaveBeenCalled();
   });
 });

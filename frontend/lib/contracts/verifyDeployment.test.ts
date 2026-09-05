@@ -12,6 +12,7 @@ import {
 } from "../../../scripts/verifyDeployment";
 
 const ADDRESS = "0x1111111111111111111111111111111111111111" as const;
+const DEPLOYER_ADDRESS = "0x2222222222222222222222222222222222222222" as const;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const TRANSACTION_HASH = `0x${"a".repeat(64)}` as const;
 const OTHER_TRANSACTION_HASH = `0x${"b".repeat(64)}` as const;
@@ -53,7 +54,7 @@ describe("deployment receipt verification", () => {
     ],
   ])("rejects an invalid deployment receipt: %s", (receipt, message) => {
     expect(() =>
-      verifyDeploymentReceipt({ hash: TRANSACTION_HASH, ...receipt }, TRANSACTION_HASH),
+      verifyDeploymentReceipt({ hash: TRANSACTION_HASH, from_address: DEPLOYER_ADDRESS, ...receipt }, TRANSACTION_HASH, DEPLOYER_ADDRESS),
     ).toThrow(message);
   });
 
@@ -61,10 +62,11 @@ describe("deployment receipt verification", () => {
     expect(
       verifyDeploymentReceipt({
         hash: TRANSACTION_HASH,
+        from_address: DEPLOYER_ADDRESS,
         statusName: "FINALIZED",
         txExecutionResultName: "FINISHED_WITH_RETURN",
         txDataDecoded: { contractAddress: ADDRESS },
-      }, TRANSACTION_HASH),
+      }, TRANSACTION_HASH, DEPLOYER_ADDRESS),
     ).toEqual({
       contractAddress: ADDRESS,
       executionResult: "FINISHED_WITH_RETURN",
@@ -75,10 +77,11 @@ describe("deployment receipt verification", () => {
     expect(() =>
       verifyDeploymentReceipt({
         hash: OTHER_TRANSACTION_HASH,
+        from_address: DEPLOYER_ADDRESS,
         statusName: "FINALIZED",
         txExecutionResultName: "FINISHED_WITH_RETURN",
         to_address: ADDRESS,
-      }, TRANSACTION_HASH),
+      }, TRANSACTION_HASH, DEPLOYER_ADDRESS),
     ).toThrow("transaction hash mismatch");
   });
 

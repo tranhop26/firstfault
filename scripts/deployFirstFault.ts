@@ -85,6 +85,7 @@ async function verifyAndRecordDeployment(
   const { contractAddress, executionResult } = verifyDeploymentReceipt(
     receipt,
     deploymentTransactionHash,
+    input.deployerAddress,
   );
   const evidence = await verifyLiveDeployment(
     input.client,
