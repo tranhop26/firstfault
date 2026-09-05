@@ -38,7 +38,7 @@ function makeHarness(overrides: Partial<DeploymentClient> = {}) {
       return {
         hash: TRANSACTION_HASH,
         from_address: DEPLOYER_ADDRESS,
-        statusName: "FINALIZED",
+        status_name: "FINALIZED",
         txExecutionResultName: "FINISHED_WITH_RETURN",
         to_address: CONTRACT_ADDRESS,
       };

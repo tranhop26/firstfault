@@ -15,6 +15,7 @@ export type DeploymentReceiptLike = {
   from_address?: string;
   sender?: string;
   statusName?: string;
+  status_name?: string;
   txExecutionResultName?: string;
   to_address?: string;
   recipient?: string;
@@ -58,7 +59,8 @@ export function verifyDeploymentReceipt(
       throw new Error("Deployment receipt deployer address mismatch");
     }
   }
-  if (receipt.statusName !== TransactionStatus.FINALIZED) {
+  const statusName = receipt.statusName ?? receipt.status_name;
+  if (statusName !== TransactionStatus.FINALIZED) {
     throw new Error("Deployment is not finalized");
   }
   const localExecution = receipt.consensus_data?.leader_receipt?.[0]?.execution_result;

@@ -63,7 +63,7 @@ describe("deployment receipt verification", () => {
       verifyDeploymentReceipt({
         hash: TRANSACTION_HASH,
         from_address: DEPLOYER_ADDRESS,
-        statusName: "FINALIZED",
+        status_name: "FINALIZED",
         txExecutionResultName: "FINISHED_WITH_RETURN",
         txDataDecoded: { contractAddress: ADDRESS },
       }, TRANSACTION_HASH, DEPLOYER_ADDRESS),
