@@ -10,6 +10,8 @@ import {
 type Address = `0x${string}`;
 
 export type DeploymentReceiptLike = {
+  hash?: string;
+  txId?: string;
   statusName?: string;
   txExecutionResultName?: string;
   to_address?: string;
@@ -35,7 +37,15 @@ export type DeploymentReadClient = {
 
 export function verifyDeploymentReceipt(
   receipt: DeploymentReceiptLike,
+  expectedTransactionHash: `0x${string}`,
 ): VerifiedDeploymentReceipt {
+  const receiptHash = receipt.hash ?? receipt.txId;
+  if (
+    typeof receiptHash !== "string" ||
+    receiptHash.toLowerCase() !== expectedTransactionHash.toLowerCase()
+  ) {
+    throw new Error("Deployment receipt transaction hash mismatch");
+  }
   if (receipt.statusName !== TransactionStatus.FINALIZED) {
     throw new Error("Deployment is not finalized");
   }
@@ -82,6 +92,6 @@ export async function verifyDeployment(hash: Hash, endpoint?: string) {
     interval: 5_000,
     retries: 120,
   });
-  const verified = verifyDeploymentReceipt(receipt);
+  const verified = verifyDeploymentReceipt(receipt, hash);
   return { receipt, contractAddress: verified.contractAddress };
 }

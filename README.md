@@ -104,6 +104,15 @@ npm run deploy
 
 The script fails closed when the key, chain, receipt, address, source, schema, explorer link, or manifest path is invalid. It refuses to overwrite an existing manifest. The private key is excluded from preflight, errors, logs, and evidence.
 
+If a transaction hash was printed but receipt waiting, readback, or manifest writing later failed, do not deploy again. Set that exact hash and rerun the same command; this resumes finality/readback verification without calling `deployContract`:
+
+```powershell
+$env:GENLAYER_DEPLOYMENT_TX_HASH = "0x..."
+npm run deploy
+```
+
+The resumed receipt must identify the same transaction hash before evidence can be written.
+
 ## Evidence matrix
 
 | Actor | Action | Contract method | Transaction | Finalized/success | Readback |

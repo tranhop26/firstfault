@@ -17,6 +17,7 @@ type Address = `0x${string}`;
 type TransactionHash = `0x${string}`;
 
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
+const TRANSACTION_HASH_PATTERN = /^0x[0-9a-fA-F]{64}$/;
 const STUDIONET_CHAIN_ID = 61999;
 const STUDIONET_EXPLORER = "https://explorer-studio.genlayer.com";
 
@@ -66,40 +67,25 @@ function validatePreflight(input: DeployFirstFaultInput): void {
   }
 }
 
-export async function deployFirstFault(
+async function verifyAndRecordDeployment(
   input: DeployFirstFaultInput,
+  deploymentTransactionHash: TransactionHash,
+  writeManifest: ManifestWriter,
+  now: () => Date,
 ): Promise<DeploymentManifest> {
-  validatePreflight(input);
-  const assertManifestAbsent =
-    input.assertManifestAbsent ?? assertDeploymentManifestAbsent;
-  const writeManifest = input.writeManifest ?? writeDeploymentManifestAtomically;
-  const now = input.now ?? (() => new Date());
-
-  await assertManifestAbsent(input.manifestPath);
-  const chainId = await input.client.getChainId();
-  if (chainId !== STUDIONET_CHAIN_ID) {
-    throw new Error(
-      `Expected Studionet chain ID ${STUDIONET_CHAIN_ID}, received ${chainId}`,
-    );
+  if (!TRANSACTION_HASH_PATTERN.test(deploymentTransactionHash)) {
+    throw new Error("Invalid deployment transaction hash");
   }
-
-  const deploymentTransactionHash = await input.client.deployContract({
-    code: input.source,
-    args: [],
-  });
-  input.onSubmitted?.({
-    deploymentTransactionHash,
-    deployerAddress: input.deployerAddress,
-  });
-
   const receipt = await input.client.waitForTransactionReceipt({
     hash: deploymentTransactionHash,
     status: TransactionStatus.FINALIZED,
     interval: 5_000,
     retries: 120,
   });
-  const { contractAddress, executionResult } =
-    verifyDeploymentReceipt(receipt);
+  const { contractAddress, executionResult } = verifyDeploymentReceipt(
+    receipt,
+    deploymentTransactionHash,
+  );
   const evidence = await verifyLiveDeployment(
     input.client,
     contractAddress,
@@ -121,4 +107,58 @@ export async function deployFirstFault(
     predecessor: null,
     successor: null,
   });
+}
+
+async function prepareDeployment(
+  input: DeployFirstFaultInput,
+): Promise<{ writeManifest: ManifestWriter; now: () => Date }> {
+  validatePreflight(input);
+  const assertManifestAbsent =
+    input.assertManifestAbsent ?? assertDeploymentManifestAbsent;
+  const writeManifest = input.writeManifest ?? writeDeploymentManifestAtomically;
+  const now = input.now ?? (() => new Date());
+
+  await assertManifestAbsent(input.manifestPath);
+  const chainId = await input.client.getChainId();
+  if (chainId !== STUDIONET_CHAIN_ID) {
+    throw new Error(
+      `Expected Studionet chain ID ${STUDIONET_CHAIN_ID}, received ${chainId}`,
+    );
+  }
+  return { writeManifest, now };
+}
+
+export async function deployFirstFault(
+  input: DeployFirstFaultInput,
+): Promise<DeploymentManifest> {
+  const { writeManifest, now } = await prepareDeployment(input);
+
+  const deploymentTransactionHash = await input.client.deployContract({
+    code: input.source,
+    args: [],
+  });
+  input.onSubmitted?.({
+    deploymentTransactionHash,
+    deployerAddress: input.deployerAddress,
+  });
+
+  return verifyAndRecordDeployment(
+    input,
+    deploymentTransactionHash,
+    writeManifest,
+    now,
+  );
+}
+
+export async function resumeFirstFaultDeployment(
+  input: DeployFirstFaultInput,
+  deploymentTransactionHash: TransactionHash,
+): Promise<DeploymentManifest> {
+  const { writeManifest, now } = await prepareDeployment(input);
+  return verifyAndRecordDeployment(
+    input,
+    deploymentTransactionHash,
+    writeManifest,
+    now,
+  );
 }

@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import { EXPECTED_FIRSTFAULT_METHODS } from "../../../scripts/deploymentEvidence";
 import {
   deployFirstFault,
+  resumeFirstFaultDeployment,
   type DeploymentClient,
   type DeployFirstFaultInput,
 } from "../../../scripts/deployFirstFault";
@@ -181,5 +182,27 @@ describe("FirstFault Studionet deployment orchestration", () => {
 
     await expect(deployFirstFault(input)).rejects.toThrow("RPC unavailable");
     expect(writeManifest).not.toHaveBeenCalled();
+  });
+
+  test("resumes verification from a submitted hash without deploying again", async () => {
+    const { calls, client, input } = makeHarness();
+
+    const result = await resumeFirstFaultDeployment(input, TRANSACTION_HASH);
+
+    expect(client.deployContract).not.toHaveBeenCalled();
+    expect(client.waitForTransactionReceipt).toHaveBeenCalledWith({
+      hash: TRANSACTION_HASH,
+      status: "FINALIZED",
+      interval: 5_000,
+      retries: 120,
+    });
+    expect(calls).toEqual([
+      "manifest-absent",
+      "finalized",
+      "code",
+      "schema",
+      "manifest",
+    ]);
+    expect(result.deploymentTransactionHash).toBe(TRANSACTION_HASH);
   });
 });

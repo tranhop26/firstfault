@@ -13,7 +13,9 @@ import {
 } from "../scripts/deploymentEvidence";
 import {
   deployFirstFault,
+  resumeFirstFaultDeployment,
   type DeploymentClient,
+  type DeployFirstFaultInput,
 } from "../scripts/deployFirstFault";
 import { deploymentLogFields } from "../scripts/writeDeploymentManifest";
 
@@ -46,7 +48,7 @@ export async function main(): Promise<void> {
     sourceSha256: sha256Hex(normalizeSource(source)),
   });
 
-  const manifest = await deployFirstFault({
+  const deploymentInput: DeployFirstFaultInput = {
     client: client as DeploymentClient,
     source,
     manifestPath,
@@ -59,7 +61,13 @@ export async function main(): Promise<void> {
         deploymentTransactionHash,
       });
     },
-  });
+  };
+  const resumeHash = process.env.GENLAYER_DEPLOYMENT_TX_HASH as
+    | `0x${string}`
+    | undefined;
+  const manifest = resumeHash
+    ? await resumeFirstFaultDeployment(deploymentInput, resumeHash)
+    : await deployFirstFault(deploymentInput);
   console.info("FirstFault deployment verified", deploymentLogFields(manifest));
 }
 
