@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "project": "firstfault",
+  "team": "TDH's projects",
+  "teamSlug": "tdh-s-projects",
+  "repository": "https://github.com/tranhop26/firstfault",
+  "branch": "main",
+  "rootDirectory": "frontend",
+  "deploymentCommit": "35b65b5cf852791779bbcedd2ca0231c82ee14f9",
+  "url": "https://firstfault.vercel.app",
+  "environment": {
+    "NEXT_PUBLIC_GENLAYER_RPC_URL": "https://studio.genlayer.com/api",
+    "NEXT_PUBLIC_GENLAYER_CHAIN_ID": "61999",
+    "NEXT_PUBLIC_CONTRACT_ADDRESS": "0x2271AE904A97865491e4b24c49532f71B711eD5f"
+  },
+  "verifiedAt": "2026-09-05T15:33:58.5032440Z",
+  "http": {
+    "status": 200,
+    "containsProjectTitle": true
+  },
+  "liveChecks": {
+    "successfulTransactionReadback": {
+      "workflowId": "firstfault-demo-20260905-1",
+      "transactionHash": "0x0580228b6382bf4d75123ff393fb975016c89cf150b6ac7b0026ebc3ce7fb084",
+      "state": "DRAFT",
+      "stepStates": ["PENDING", "PENDING", "PENDING"],
+      "stepAmounts": ["10", "10", "10"],
+      "deposited": "0",
+      "reserved": "0"
+    },
+    "importantErrorBranch": {
+      "workflowId": "missing-vercel-proof-20260905",
+      "uiState": "Workflow could not be read",
+      "retryOffered": true
+    }
+  }
+}
