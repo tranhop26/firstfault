@@ -52,6 +52,11 @@ export function getContractAddress(): string {
   return address;
 }
 
+export function getContractVersion(): "v1" | "v2" | "v3" {
+  const version = process.env.NEXT_PUBLIC_CONTRACT_VERSION;
+  return version === "v3" ? "v3" : version === "v2" ? "v2" : "v1";
+}
+
 /**
  * Check if MetaMask is installed
  */

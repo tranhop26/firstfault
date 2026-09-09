@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AgentTankBadge, AgentTankEntryLabel } from "@/components/AgentTankBadge";
 import { WorkflowComposer } from "@/components/firstfault/WorkflowComposer";
 import { WorkflowTimeline } from "@/components/firstfault/WorkflowTimeline";
 import { EvidencePanel } from "@/components/firstfault/EvidencePanel";
 import { VerdictPanel } from "@/components/firstfault/VerdictPanel";
 import { TransactionStatus } from "@/components/firstfault/TransactionStatus";
+import { FundingPanel } from "@/components/firstfault/FundingPanel";
+import { RecoveryPanel } from "@/components/firstfault/RecoveryPanel";
 import { canWrite } from "@/lib/firstfault/status";
+import { formatGen } from "@/lib/firstfault/amounts";
+import { isDisputeTimeoutReady } from "@/lib/firstfault/recovery";
 import { useFirstFault } from "@/lib/hooks/useFirstFault";
 import type { CreateWorkflowInput } from "@/lib/contracts/FirstFault";
 
@@ -17,10 +21,23 @@ export default function HomePage() {
   const [workflowId, setWorkflowId] = useState("");
   const [search, setSearch] = useState("");
   const [rejection, setRejection] = useState("");
+  const [nowSeconds, setNowSeconds] = useState(0);
   const app = useFirstFault(workflowId);
   const writable = canWrite({ connected: app.wallet.isConnected, correctNetwork: app.wallet.isOnCorrectNetwork, configured: app.configured }) && !app.actionPending;
   const isBuyer = Boolean(app.workflow && app.wallet.address?.toLowerCase() === app.workflow.buyer.toLowerCase());
   const isOrchestrator = Boolean(app.workflow && app.wallet.address?.toLowerCase() === app.workflow.orchestrator.toLowerCase());
+  const activeWorkerStep = app.steps.find((step) => app.wallet.address?.toLowerCase() === step.worker.toLowerCase());
+  const activeWorkerVerdict = app.workflow?.verdict?.step_statuses.find((item) => item.step_index === activeWorkerStep?.step_index);
+  const isWorkflowParty = isBuyer || Boolean(activeWorkerStep);
+  useEffect(() => {
+    setNowSeconds(Math.floor(Date.now() / 1000));
+    const timer = window.setInterval(() => setNowSeconds(Math.floor(Date.now() / 1000)), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const workerDeadlineExpired = app.steps.some((step) => step.state === "PENDING" && nowSeconds > Number(step.deadline));
+  const reviewDeadlineExpired = Boolean(app.workflow?.review_deadline && nowSeconds > Number(app.workflow.review_deadline));
+  const retryReady = Boolean(app.workflow?.round_opened_at && nowSeconds > Number(app.workflow.round_opened_at) + 3_600);
+  const disputeTimeoutReady = Boolean(app.workflow && isDisputeTimeoutReady(app.workflow, app.steps, app.recovery?.cures ?? [], nowSeconds));
   const total = app.steps.reduce((sum, step) => sum + BigInt(step.amount), 0n);
 
   const create = async (input: CreateWorkflowInput) => {
@@ -40,7 +57,7 @@ export default function HomePage() {
             {app.wallet.isConnected ? <><span title={app.wallet.address ?? ""}>{short(app.wallet.address ?? "")}</span><button onClick={app.wallet.disconnectWallet}>Disconnect</button></> : <button className="ff-connect" onClick={() => app.wallet.connectWallet()}>Connect wallet</button>}
           </div>
         </div></div>
-        <div className="ff-subnav"><div className="ff-shell"><span>Workflow desk</span><span>Evidence</span><span>Disputes</span><span>Recovery</span><span className="ff-frozen">Intentionally frozen contract</span></div></div>
+        <div className="ff-subnav"><div className="ff-shell"><span>Workflow desk</span><span>Evidence</span><span>Disputes</span><span>Recovery</span><span className="ff-frozen">{app.contractVersion === "v2" ? "V2 recovery contract" : "Intentionally frozen contract"}</span></div></div>
       </header>
 
       <main>
@@ -81,27 +98,34 @@ export default function HomePage() {
               <div className="ff-case-badges"><span>✓ On-chain readback</span><span>◇ Evidence bound</span></div>
             </section>
             <section className="ff-accounting">
-              {[['Deposited',app.workflow.deposited],['Reserved',app.workflow.reserved],['Payout scheduled',app.workflow.payout_scheduled],['Refund scheduled',app.workflow.refund_scheduled]].map(([label,value]) => <div key={label}><span>{label}</span><strong>{value}</strong><small>simulated GEN</small></div>)}
+              {[['Deposited',app.workflow.deposited],['Reserved',app.workflow.reserved],['Payout scheduled',app.workflow.payout_scheduled],['Refund scheduled',app.workflow.refund_scheduled]].map(([label,value]) => <div key={label}><span>{label}</span><strong>{formatGen(value)}</strong><small>simulated GEN</small></div>)}
             </section>
             <div className="ff-workspace">
-              <div className="ff-main-column"><WorkflowTimeline steps={app.steps} activeAddress={app.wallet.address} canAct={writable} onSubmit={(...args) => app.submitStep(...args)} /><EvidencePanel steps={app.steps}/><VerdictPanel workflow={app.workflow}/></div>
+              <div className="ff-main-column"><WorkflowTimeline steps={app.steps} workflowState={app.workflow.state} activeAddress={app.wallet.address} canAct={writable} onSubmit={(...args) => app.submitStep(...args)} /><EvidencePanel steps={app.steps}/><VerdictPanel workflow={app.workflow}/>{app.workflow.state === 'UNRESOLVED' && <RecoveryPanel workflowId={workflowId} reserved={app.workflow.reserved} unresolvedReason={app.workflow.unresolved_reason} canCure={writable && activeWorkerVerdict?.status === "UNRESOLVED"} canSettle={writable && isWorkflowParty} canExecute={writable} recovery={app.recovery} onSubmitCure={app.submitCure} onPropose={app.proposeSettlement} onApprove={app.approveSettlement} onExecute={app.executeSettlement} />}</div>
               <aside className="ff-side-column">
                 <section className="ff-panel ff-action-card"><span className="ff-eyebrow">Available actions</span><h2>Case controls</h2><p>Buttons reflect your connected role; the contract enforces final authorization.</p>
-                  {app.workflow.state === 'DRAFT' && isBuyer && <button disabled={!writable} className="ff-button ff-button-primary ff-full" onClick={() => app.fund(total)}>Fund {total.toString()} simulated GEN</button>}
+                  {app.workflow.state === 'DRAFT' && isBuyer && app.contractVersion === 'v3' && <FundingPanel
+                    amount={total.toString()} intent={app.fundingIntent} outcome={app.fundingOutcome}
+                    phase={app.fundingPhase} disabled={!writable}
+                    onPrepare={() => app.prepareFunding(total)} onFund={() => app.fund(total)} />}
+                  {app.workflow.state === 'DRAFT' && isBuyer && app.contractVersion !== 'v3' && <button disabled={!writable} className="ff-button ff-button-primary ff-full" onClick={() => app.fund(total)}>Fund {formatGen(total)} simulated GEN</button>}
                   {app.workflow.state === 'FUNDED' && isOrchestrator && <button disabled={!writable} className="ff-button ff-button-primary ff-full" onClick={app.start}>Start workflow</button>}
                   {app.workflow.state === 'FUNDED' && isBuyer && <button disabled={!writable} className="ff-button ff-button-outline ff-full" onClick={app.cancel}>Cancel and schedule refund</button>}
                   {app.workflow.state === 'READY_FOR_REVIEW' && isBuyer && <><button disabled={!writable} className="ff-button ff-button-primary ff-full" onClick={app.accept}>Accept all work</button><textarea aria-label="Rejection reason" value={rejection} onChange={(e) => setRejection(e.target.value)} placeholder="State the concrete failure; this is evidence context, not the verdict."/><button disabled={!writable || !rejection.trim()} className="ff-button ff-button-danger ff-full" onClick={() => app.dispute(rejection)}>Open dispute</button></>}
-                  {app.workflow.state === 'DISPUTED' && <><button disabled={!writable} className="ff-button ff-button-primary ff-full" onClick={app.adjudicate}>Request GenLayer decision</button><button disabled={!writable} className="ff-button ff-button-outline ff-full" onClick={app.timeout}>Attempt safe timeout</button></>}
+                  {app.workflow.state === 'DISPUTED' && <><button disabled={!writable} className="ff-button ff-button-primary ff-full" onClick={app.adjudicate}>Request GenLayer decision</button>{disputeTimeoutReady ? <button disabled={!writable} className="ff-button ff-button-outline ff-full" onClick={app.timeout}>Move stale consensus to recovery</button> : <div className="ff-no-action">Consensus timeout is available only after every stored observation is stale.</div>}</>}
+                  {app.contractVersion !== 'v1' && app.workflow.state === 'IN_PROGRESS' && (workerDeadlineExpired ? <button disabled={!writable} className="ff-button ff-button-outline ff-full" onClick={app.timeoutIncomplete}>Open adjudication for missed delivery</button> : <div className="ff-no-action">Recovery becomes available after the current worker deadline.</div>)}
+                  {app.contractVersion !== 'v1' && app.workflow.state === 'READY_FOR_REVIEW' && (reviewDeadlineExpired ? <button disabled={!writable} className="ff-button ff-button-outline ff-full" onClick={app.timeoutReview}>Open adjudication after review silence</button> : <div className="ff-no-action">The buyer review window is still open.</div>)}
+                  {app.contractVersion !== 'v1' && app.workflow.state === 'UNRESOLVED' && ['ADJUDICATION_UNRESOLVED', 'CONSENSUS_TIMEOUT'].includes(app.workflow.unresolved_reason ?? '') && (retryReady ? <button disabled={!writable} className="ff-button ff-button-outline ff-full" onClick={app.retryAdjudication}>Retry the same evidence</button> : <div className="ff-no-action">The one-hour consensus retry delay is still running.</div>)}
                   {!['DRAFT','FUNDED','READY_FOR_REVIEW','DISPUTED'].includes(app.workflow.state) && <div className="ff-no-action">No primary action is available in this state. Contract readback remains authoritative.</div>}
                 </section>
                 <TransactionStatus status={app.status} parentHash={app.parentHash} childHashes={app.childHashes}/>
-                <section className="ff-panel ff-ledger"><span className="ff-eyebrow">Custody ledger</span><h2>Conservation view</h2>{app.accounting && Object.entries(app.accounting).map(([key,value]) => <div key={key}><span>{key.replaceAll('_',' ')}</span><strong>{value}</strong></div>)}<p>Scheduled is not paid. Recipient balance proof is tracked separately.</p></section>
+                <section className="ff-panel ff-ledger"><span className="ff-eyebrow">Custody ledger</span><h2>Conservation view</h2>{app.accounting && Object.entries(app.accounting).map(([key,value]) => <div key={key}><span>{key.replaceAll('_',' ')}</span><strong>{formatGen(value)} GEN</strong></div>)}<p>Scheduled is not paid. Recipient balance proof is tracked separately.</p></section>
               </aside>
             </div>
           </>}
         </div>
       </main>
-      <footer><div className="ff-shell"><div className="ff-footer-brand"><div className="ff-logo"><span className="ff-logo-mark">F</span><span>FirstFault</span></div><AgentTankBadge compact /></div><p>Built for Agent Tank · Powered by GenLayer Studionet<br/>Intentionally frozen contract · simulated Studionet value</p><div><a href="https://genlayer.com" target="_blank" rel="noreferrer">GenLayer</a><a href="https://explorer-studio.genlayer.com" target="_blank" rel="noreferrer">Explorer</a></div></div></footer>
+      <footer><div className="ff-shell"><div className="ff-footer-brand"><div className="ff-logo"><span className="ff-logo-mark">F</span><span>FirstFault</span></div><AgentTankBadge compact /></div><p>Built for Agent Tank · Powered by GenLayer Studionet<br/>{app.contractVersion === "v2" ? "V2 recovery contract" : "Intentionally frozen contract"} · simulated Studionet value</p><div><a href="https://genlayer.com" target="_blank" rel="noreferrer">GenLayer</a><a href="https://explorer-studio.genlayer.com" target="_blank" rel="noreferrer">Explorer</a></div></div></footer>
     </div>
   );
 }

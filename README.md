@@ -24,7 +24,8 @@ contracts/firstfault.py
 authoritative workflow, accounting, recovery and transfer state
 ```
 
-- `contracts/firstfault.py` — frozen Intelligent Contract and source of truth.
+- `contracts/firstfault.py` — deployed, frozen V1 Intelligent Contract and source of truth.
+- `contracts/firstfault_v2.py` — separately deployed, frozen Studionet successor with deadline, recovery, and consensus-captured source snapshot fixes; see [docs/FIRSTFAULT_V2.md](docs/FIRSTFAULT_V2.md).
 - `tests/direct/` — authorization, transitions, evidence, adjudication, custody, replay, refund, and recovery tests.
 - `tests/integration/` — real Localnet consensus and balance-conservation flows.
 - `frontend/` — responsive wallet interface with separate disconnected, pending, finalized, success, error, and readback states.
@@ -63,7 +64,8 @@ Copy `.env.example` for deployment/local operation and `frontend/.env.example` t
 | `GENLAYER_RPC_URL` | Deployment RPC; defaults to `https://studio.genlayer.com/api` |
 | `NEXT_PUBLIC_GENLAYER_RPC_URL` | Browser RPC |
 | `NEXT_PUBLIC_GENLAYER_CHAIN_ID` | Studionet chain ID `61999` |
-| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Address copied only from verified `deployments/studionet.json` |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Address copied from the verified manifest for the selected contract version |
+| `NEXT_PUBLIC_CONTRACT_VERSION` | `v1` by default; use `v2` only with a separately verified V2 address |
 
 An empty contract address is intentional before deployment. The frontend reports that live interaction is unavailable; it does not substitute mock contract data.
 
@@ -95,6 +97,10 @@ npm run dev
 ## Verified Studionet deployment
 
 Status: **Verified on Studionet.** The frozen contract is deployed at [`0x2271AE904A97865491e4b24c49532f71B711eD5f`](https://explorer-studio.genlayer.com/address/0x2271AE904A97865491e4b24c49532f71B711eD5f) by wallet `0x21b45103dd05c43969daF3CbB4277391777e2eC7`. Deployment transaction [`0x47b36d…19e1920`](https://explorer-studio.genlayer.com/tx/0x47b36dcc4b7843534f06f299272e96722086bff2f2c2c0daa983ed14119e1920) finalized successfully. Live readback matched source commit `5ef8accf3f19bac356f73f31610aed8f95e47050`, SHA-256 `96be404cb2a2338ed293f452c0a0e133d967db4c17ccdc4a0077d803ab5907ae`, and the exact 17-method schema recorded in `deployments/studionet.json`.
+
+FirstFault V2 is separately deployed at [`0x24c060E5394b5bD14a5546B055A7F049f9842987`](https://explorer-studio.genlayer.com/address/0x24c060E5394b5bD14a5546B055A7F049f9842987) by the same wallet. Deployment transaction [`0x189c6d…1db2d`](https://explorer-studio.genlayer.com/tx/0x189c6d629cde61aff8893c3d8dcc45ea9908a0a4da95d6a3b7b5b5db3fd1db2d) is `FINALIZED` with a successful execution result. Live RPC readback matched commit `e171fc108c92d3e9d346686c5f87c2e760c05aee`, SHA-256 `8bff11b1506437ef5c1ebab01ce084e0a63f57c1d78319953f19263987dc83c5`, and the exact 20-method schema in `deployments/studionet-v2.json`. Production remains on V1 until separate live V2 workflow evidence and frontend-deployment confirmation exist.
+
+FirstFault V3 is deployed at [`0x9236A835741DF7f891613B5578753647C140124E`](https://explorer-studio.genlayer.com/address/0x9236A835741DF7f891613B5578753647C140124E) by the same wallet. Deployment transaction [`0x9e3d32…b62fdc`](https://explorer-studio.genlayer.com/tx/0x9e3d328e3ec5a325ab25fffa26b006b692f7891d11de05703436304830b62fdc) is `FINALIZED` with successful execution. Live RPC readback matched commit `6e4b3b8a632ee519d571674af0b5e64bfc6d74e1`, SHA-256 `7164c7edf6bd2def6dce69615b4acce0f8899ffa7fa094b8cd59f6c1df426617`, and the exact 24-method schema in `deployments/studionet-v3.json`. V3 remains disabled in production until its live custody branches and frontend integration are proven separately.
 
 ## Live application
 
@@ -134,6 +140,8 @@ The resumed receipt must identify the same transaction hash before evidence can 
 | Actor | Action | Contract method | Transaction | Finalized/success | Readback |
 |---|---|---|---|---|---|
 | Deployer | Deploy frozen FirstFault source | Contract deployment | [`0x47b36d…19e1920`](https://explorer-studio.genlayer.com/tx/0x47b36dcc4b7843534f06f299272e96722086bff2f2c2c0daa983ed14119e1920) | `FINALIZED` / `FINISHED_WITH_RETURN` | [Address](https://explorer-studio.genlayer.com/address/0x2271AE904A97865491e4b24c49532f71B711eD5f), exact source hash and 17-method schema verified |
+| Deployer | Deploy frozen FirstFault V2 successor | Contract deployment | [`0x189c6d…1db2d`](https://explorer-studio.genlayer.com/tx/0x189c6d629cde61aff8893c3d8dcc45ea9908a0a4da95d6a3b7b5b5db3fd1db2d) | `FINALIZED` / `FINISHED_WITH_RETURN` | [V2 address](https://explorer-studio.genlayer.com/address/0x24c060E5394b5bD14a5546B055A7F049f9842987), exact source hash and 20-method schema verified |
+| Deployer | Deploy frozen FirstFault V3 successor | Contract deployment | [`0x9e3d32…b62fdc`](https://explorer-studio.genlayer.com/tx/0x9e3d328e3ec5a325ab25fffa26b006b692f7891d11de05703436304830b62fdc) | `FINALIZED` / `FINISHED_WITH_RETURN` | [V3 address](https://explorer-studio.genlayer.com/address/0x9236A835741DF7f891613B5578753647C140124E), exact source hash and 24-method schema verified |
 | Buyer | Create workflow | `create_workflow` | [`0x058022…fb084`](https://explorer-studio.genlayer.com/tx/0x0580228b6382bf4d75123ff393fb975016c89cf150b6ac7b0026ebc3ce7fb084) | `FINALIZED` / `SUCCESS`, 5/5 validators agreed | `firstfault-demo-20260905-1` is `DRAFT`; actors, briefs, 10/10/10 holds and zero custody read back from contract |
 | Buyer | Repeat an existing workflow ID | `create_workflow` | [`0xa48670…f40b7f`](https://explorer-studio.genlayer.com/tx/0xa486707f0b85c57c334b3cf57e18cb71d86a39b894d05e639f5061314af40b7f) | `FINALIZED` / `ERROR`; rollback `Workflow already exists` | Original workflow remains `DRAFT` and accounting remains unchanged |
 | Reviewer | Inspect the successful workflow from the live app | `get_workflow`, `get_step`, `get_accounting` | Read-only production call tied to [`0x058022…fb084`](https://explorer-studio.genlayer.com/tx/0x0580228b6382bf4d75123ff393fb975016c89cf150b6ac7b0026ebc3ce7fb084) | Vercel deployment of commit `35b65b5` returned HTTP 200 | Live UI reconstructed `DRAFT`, all three workers, briefs, step states, 10/10/10 holds and zero custody |
@@ -147,13 +155,14 @@ The resumed receipt must identify the same transaction hash before evidence can 
 | Contract | Execute adjudication value consequence | Triggered external transfers | [`17 refund`](https://explorer-studio.genlayer.com/tx/0xb47500b7b0d1c819d5522e4384434be9dce304f39c947e43ca34b6e0784e326d), [`11 payout`](https://explorer-studio.genlayer.com/tx/0xc03a8adb99a2fbeed8d924c19b3acebd89a925dec1c071366e2df4ba9fff1304), [`23 payout`](https://explorer-studio.genlayer.com/tx/0xb01ae878c44e5a257f6c9764a0273473fba6945b1b9bb221788986109bfda1d5) | All `FINALIZED`, value credited | Exact recipients and values total 51; contract balance reads 0 |
 | Buyer after timeout | Preserve custody safely | `timeout_dispute_to_unresolved` | [`0xdf2b9f…6985e2`](https://explorer-studio.genlayer.com/tx/0xdf2b9f74f65b9e59678ecd9bcdb2594fe9d9fb3409b59dbe1f433bef4d6985e2) | `FINALIZED` / `SUCCESS` | `UNRESOLVED / CONSENSUS_TIMEOUT`; all 3 remains reserved, no payout/refund |
 
-Machine-readable deployment and exercised-flow evidence is recorded in `deployments/studionet.json`, `deployments/studionet-evidence.json`, `deployments/studionet-golden-demo.json`, `deployments/studionet-live-branches.json`, and `deployments/vercel.json`.
+Machine-readable deployment and exercised-flow evidence is recorded in `deployments/studionet.json`, `deployments/studionet-v2.json`, `deployments/studionet-v3.json`, `deployments/studionet-evidence.json`, `deployments/studionet-golden-demo.json`, `deployments/studionet-live-branches.json`, and `deployments/vercel.json`.
 
 ## Known limitations
 
 - V1 is frozen; replacing faulty behavior requires a separately deployed and reviewed successor. Existing holds cannot be silently migrated.
 - `UNRESOLVED` deliberately retains reserved value until a contract-governed recovery path succeeds.
 - Localnet and Studionet activity demonstrates development behavior, not production-value settlement.
+- V3 deployment source and schema are verified, but its promoted custody branches do not yet have fixed live Studionet evidence and the production frontend still uses V1.
 - Contract accounting deliberately distinguishes scheduled value from external transfer finality. `paid` and `refunded` remain zero in V1; finalized child receipts with `valueCredited=true` are the execution proof, while the contract ledger records the exact scheduled amounts and recipients.
 
 ## License

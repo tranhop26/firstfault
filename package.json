@@ -10,6 +10,8 @@
     "lint": "cd frontend && npm run lint",
     "test": "cd frontend && npm test",
     "deploy": "tsx deploy/deployScript.ts",
+    "deploy:v2": "tsx deploy/deployV2.ts",
+    "deploy:v3": "tsx deploy/deployV3.ts",
     "lint:deploy": "tsc --noEmit --project tsconfig.json",
     "verify:deployment": "npm --prefix frontend test -- lib/contracts/verifyDeployment.test.ts lib/contracts/deploymentManifest.test.ts lib/contracts/deployFirstFault.test.ts"
   },

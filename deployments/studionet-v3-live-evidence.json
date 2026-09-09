@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 1,
+  "project": "FirstFault",
+  "contractVersion": "v3",
+  "network": "studionet",
+  "chainId": 61999,
+  "contractAddress": "0x9236A835741DF7f891613B5578753647C140124E",
+  "contractSourceCommit": "6e4b3b8a632ee519d571674af0b5e64bfc6d74e1",
+  "contractSourceSha256": "7164c7edf6bd2def6dce69615b4acce0f8899ffa7fa094b8cd59f6c1df426617",
+  "observedAt": "2026-09-09T13:05:50.927Z",
+  "actors": {
+    "buyer": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "orchestrator": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "researcher": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "writer": "0x5d39d3243F7372d08ae83983f1Eb8663d121435A",
+    "publisher": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2"
+  },
+  "rejectedFunding": {
+    "workflowId": "firstfault-v3-custody-20260909-1",
+    "intentId": "fund-v3-20260909-1",
+    "transactions": {
+      "createWorkflow": {
+        "transactionHash": "0xe07febe5bddcac4693ff48b6db52b146339c713cb8670b074166a4d4e195783c",
+        "method": "create_workflow",
+        "value": "0",
+        "status": "FINALIZED",
+        "executionResult": "SUCCESS"
+      },
+      "prepareFunding": {
+        "transactionHash": "0x8540883893c8424d9330d75f95707f9d72e4f890e63ba489cb676b0d13783f1d",
+        "method": "prepare_funding",
+        "value": "0",
+        "status": "FINALIZED",
+        "executionResult": "SUCCESS"
+      },
+      "fundWorkflow": {
+        "transactionHash": "0xfd09272e047ff1aa2ece8a3d3d6f34b173733f1e459c2dcaf7f34a7291f9e930",
+        "method": "fund_workflow",
+        "value": "3000000000000000000",
+        "status": "FINALIZED",
+        "executionResult": "SUCCESS",
+        "valueCredited": true
+      },
+      "refundTransfer": {
+        "transactionHash": "0x49de432ff1e826cd2c6a3d47ec90dc3f8f4b6c9b9c24726f34fb72305aeec56f",
+        "from": "0x9236A835741DF7f891613B5578753647C140124E",
+        "to": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+        "value": "3000000000000000000",
+        "status": "FINALIZED",
+        "valueCredited": true,
+        "triggeredBy": "0xfd09272e047ff1aa2ece8a3d3d6f34b173733f1e459c2dcaf7f34a7291f9e930"
+      }
+    },
+    "fundingOutcome": {
+      "attemptIndex": "1",
+      "result": "REFUND_SCHEDULED",
+      "reason": "WRONG_AMOUNT",
+      "received": "3000000000000000000",
+      "retained": "0",
+      "refundScheduled": "3000000000000000000",
+      "workflowState": "DRAFT"
+    },
+    "readback": {
+      "state": "DRAFT",
+      "deposited": "0",
+      "reserved": "0",
+      "payoutScheduled": "0",
+      "refundScheduled": "0"
+    }
+  },
+  "acceptedFundingInProgress": {
+    "workflowId": "firstfault-v3-funded-20260909-1",
+    "intentId": "fund-v3-success-20260909-1",
+    "transactions": {
+      "createWorkflow": {
+        "transactionHash": "0xc25f1fc53295057483867a5aabccba1591d54fa57a00962c827eb9c4f77105f3",
+        "method": "create_workflow",
+        "value": "0",
+        "status": "FINALIZED",
+        "executionResult": "SUCCESS"
+      },
+      "prepareFunding": {
+        "transactionHash": "0xc1cd98739b23111302d8b6ba8455aebc80826c2eca7e2d1654277688b9b10179",
+        "method": "prepare_funding",
+        "value": "0",
+        "status": "FINALIZED",
+        "executionResult": "SUCCESS"
+      },
+      "fundWorkflow": {
+        "transactionHash": "0xdcd5c1ed272ee0abeb922e4cda151140d497721873b976408713b2ca5fb08b76",
+        "method": "fund_workflow",
+        "value": "3000000000000000000",
+        "status": "FINALIZED",
+        "executionResult": "SUCCESS",
+        "valueCredited": true
+      },
+      "startWorkflow": {
+        "transactionHash": "0x892884a0454394ee768d3ebc0051f4f4a6004692dc9929787f55d661d97c9f56",
+        "method": "start_workflow",
+        "value": "0",
+        "status": "FINALIZED",
+        "executionResult": "SUCCESS"
+      },
+      "submitResearch": {
+        "transactionHash": "0x05e9f18158265a3e6aa21d145c683058373eb57152061e4b7d9a6ace48cd3a3b",
+        "method": "submit_step",
+        "value": "0",
+        "status": "FINALIZED",
+        "executionResult": "SUCCESS"
+      },
+      "submitWriter": {
+        "transactionHash": "0xeb118b7603d431855ff786d48e05aa85bc05ed5cc626744a720264f8065a11dd",
+        "method": "submit_step",
+        "value": "0",
+        "status": "FINALIZED",
+        "executionResult": "SUCCESS"
+      },
+      "submitPublisher": {
+        "transactionHash": "0x28b93700b8e43bbde04d17c95e8cf8c3d55759c9904d24db675fb6b5ff9753dc",
+        "method": "submit_step",
+        "value": "0",
+        "status": "FINALIZED",
+        "executionResult": "SUCCESS"
+      },
+      "acceptWorkflow": {
+        "transactionHash": "0x551e9c6fd802866b1bda0abdcff453f311e2d3021dc739f03df5982f7fe230ba",
+        "method": "accept_workflow",
+        "value": "0",
+        "status": "FINALIZED",
+        "executionResult": "SUCCESS"
+      }
+    },
+    "fundingOutcome": {
+      "attemptIndex": "2",
+      "result": "FUNDED",
+      "reason": "",
+      "received": "3000000000000000000",
+      "retained": "3000000000000000000",
+      "refundScheduled": "0",
+      "workflowState": "FUNDED"
+    },
+    "researchEvidence": {
+      "stepIndex": 0,
+      "worker": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "state": "SUBMITTED",
+      "amount": "1000000000000000000",
+      "briefHash": "193bfbd513028200c700b47871b566f93e244c3827521047a500d4675c3fb3fe",
+      "outputHash": "84186d09dd99247312dd24a0cb1885cccf688cb70c0141a9c0f52c358ae9e202",
+      "upstreamHash": "",
+      "sourceUrl": "https://www.iana.org/help/example-domains",
+      "sourceContentHash": "6df12620d6e1c1029a1534fc0b2e0eba7107db6daba73f6ae8e52f32386c340a",
+      "sourceSnapshotVersion": "firstfault-source-snapshot-v1",
+      "evidenceHash": "eec39707993e33bee75fc37590b28c22b99963f35d962eebc69cc5f4167dcf86",
+      "schemaVersion": "firstfault-evidence-v2",
+      "observedAt": "1788958138",
+      "submittedAt": "1788958150"
+    },
+    "writerEvidence": {
+      "stepIndex": 1,
+      "worker": "0x5d39d3243F7372d08ae83983f1Eb8663d121435A",
+      "state": "SUBMITTED",
+      "amount": "1000000000000000000",
+      "briefHash": "0c7ef6e8cf445aa797a01eb91f7df5b38e80882474ec31dc191b7bf9184f0b85",
+      "outputHash": "e57bdf62a2b2e0ac5b53b9c7c1ea32db246834fccabb7f746a536f5d9378c7de",
+      "upstreamHash": "84186d09dd99247312dd24a0cb1885cccf688cb70c0141a9c0f52c358ae9e202",
+      "sourceUrl": "",
+      "sourceContentHash": "",
+      "sourceSnapshotVersion": "",
+      "evidenceHash": "22d586e8b57004e528bd11661be7d9e4b3906f24566a52302258ac4ff1a5f57d",
+      "schemaVersion": "firstfault-evidence-v2",
+      "observedAt": "1788958724",
+      "submittedAt": "1788958744"
+    },
+    "publisherEvidence": {
+      "stepIndex": 2,
+      "worker": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2",
+      "state": "SUBMITTED",
+      "amount": "1000000000000000000",
+      "briefHash": "19365f1591d4f6ec630f36807c1c1ba717d85d4fd8275bb245556f68d93ebfc7",
+      "outputHash": "e57bdf62a2b2e0ac5b53b9c7c1ea32db246834fccabb7f746a536f5d9378c7de",
+      "upstreamHash": "e57bdf62a2b2e0ac5b53b9c7c1ea32db246834fccabb7f746a536f5d9378c7de",
+      "sourceUrl": "",
+      "sourceContentHash": "",
+      "sourceSnapshotVersion": "",
+      "evidenceHash": "390a09c33b11eee93456a789f193199702267c41352701b268fe4da36ce29fcb",
+      "schemaVersion": "firstfault-evidence-v2",
+      "observedAt": "1788958911",
+      "submittedAt": "1788958925"
+    },
+    "readback": {
+      "state": "ACCEPTED_PENDING_FINALITY",
+      "outcome": "ACCEPTED_PENDING_FINALITY",
+      "deposited": "3000000000000000000",
+      "reserved": "0",
+      "payoutScheduled": "3000000000000000000",
+      "refundScheduled": "0",
+      "paid": "0",
+      "refunded": "0",
+      "reviewDeadline": "1789045325"
+    },
+    "payoutTransfers": [
+      {
+        "transactionHash": "0x785e60164f8c5ed780e431756b3581686bf75457af6696db8432c45aa9b5fd7d",
+        "from": "0x9236A835741DF7f891613B5578753647C140124E",
+        "to": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+        "value": "1000000000000000000",
+        "status": "FINALIZED",
+        "valueCredited": true,
+        "triggeredBy": "0x551e9c6fd802866b1bda0abdcff453f311e2d3021dc739f03df5982f7fe230ba"
+      },
+      {
+        "transactionHash": "0x0880d0efa5d62b75f23acfeb21d774dbaf2f08233052ebaf3dbc739866912bfd",
+        "from": "0x9236A835741DF7f891613B5578753647C140124E",
+        "to": "0x5d39d3243F7372d08ae83983f1Eb8663d121435A",
+        "value": "1000000000000000000",
+        "status": "FINALIZED",
+        "valueCredited": true,
+        "triggeredBy": "0x551e9c6fd802866b1bda0abdcff453f311e2d3021dc739f03df5982f7fe230ba"
+      },
+      {
+        "transactionHash": "0x5927ba810a43b2f53bc1e1a90745b7befd403a4b669b39da6b4742b3b41acfb2",
+        "from": "0x9236A835741DF7f891613B5578753647C140124E",
+        "to": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2",
+        "value": "1000000000000000000",
+        "status": "FINALIZED",
+        "valueCredited": true,
+        "triggeredBy": "0x551e9c6fd802866b1bda0abdcff453f311e2d3021dc739f03df5982f7fe230ba"
+      }
+    ],
+    "completion": {
+      "status": "COMPLETE",
+      "remainingSteps": []
+    }
+  },
+  "globalAccounting": {
+    "fundingAttemptCount": "2",
+    "totalAcceptedFunding": "3000000000000000000",
+    "totalRejectedFundingReceived": "3000000000000000000",
+    "totalRejectedFundingRefundScheduled": "3000000000000000000",
+    "totalWorkflowPayoutScheduled": "3000000000000000000",
+    "totalWorkflowRefundScheduled": "0"
+  },
+  "conservation": {
+    "acceptedFunding": "3000000000000000000",
+    "acceptedPayoutFinalized": "3000000000000000000",
+    "rejectedReceived": "3000000000000000000",
+    "rejectedRefundFinalized": "3000000000000000000",
+    "contractBalance": "0",
+    "unaccounted": "0"
+  }
+}

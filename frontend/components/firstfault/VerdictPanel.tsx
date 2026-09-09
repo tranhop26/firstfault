@@ -8,6 +8,8 @@ export function VerdictPanel({ workflow }: { workflow: FirstFaultWorkflow }) {
         <div className="ff-verdict-body">
           <div className="ff-outcome"><small>OUTCOME</small><strong>{workflow.verdict.outcome}</strong><p>{workflow.verdict.outcome === "UNRESOLVED" ? "No transfer is scheduled; the hold stays protected." : workflow.verdict.first_breach_step >= 0 ? `Earliest material breach: step ${workflow.verdict.first_breach_step + 1}` : "All three steps complied."}</p></div>
           <div className="ff-verdict-steps">{workflow.verdict.step_statuses?.map((item) => <div key={item.step_index}><span>Step {item.step_index + 1}</span><strong>{item.status}</strong></div>)}</div>
+          {workflow.verdict.reasons?.map((item) => <article className="ff-verdict-reason" key={item.step_index}><div><strong>Step {item.step_index + 1}</strong><span>{item.confidence}</span></div><p>{item.reason}</p></article>)}
+          {workflow.verdict.cited_evidence_hashes && <p className="ff-citations">Evidence cited: {workflow.verdict.cited_evidence_hashes.length}</p>}
         </div>
       )}
       {workflow.rejection_reason && <div className="ff-rejection"><span>Buyer rejection</span><p>{workflow.rejection_reason}</p></div>}
