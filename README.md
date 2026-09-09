@@ -25,7 +25,7 @@ authoritative workflow, accounting, recovery and transfer state
 ```
 
 - `contracts/firstfault.py` — deployed, frozen V1 Intelligent Contract and source of truth.
-- `contracts/firstfault_v2.py` — undeployed review candidate with deadline and recovery fixes; see [docs/FIRSTFAULT_V2.md](docs/FIRSTFAULT_V2.md).
+- `contracts/firstfault_v2.py` — undeployed review candidate with deadline, recovery, and consensus-captured source snapshot fixes; see [docs/FIRSTFAULT_V2.md](docs/FIRSTFAULT_V2.md).
 - `tests/direct/` — authorization, transitions, evidence, adjudication, custody, replay, refund, and recovery tests.
 - `tests/integration/` — real Localnet consensus and balance-conservation flows.
 - `frontend/` — responsive wallet interface with separate disconnected, pending, finalized, success, error, and readback states.

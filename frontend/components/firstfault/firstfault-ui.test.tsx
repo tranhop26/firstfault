@@ -8,6 +8,7 @@ import { WorkflowComposer } from "./WorkflowComposer";
 import { WorkflowTimeline } from "./WorkflowTimeline";
 import { VerdictPanel } from "./VerdictPanel";
 import { RecoveryPanel } from "./RecoveryPanel";
+import { EvidencePanel } from "./EvidencePanel";
 
 afterEach(cleanup);
 
@@ -52,6 +53,16 @@ describe("FirstFault truthful interface", () => {
     expect(screen.getAllByRole("article")).toHaveLength(3);
     expect(screen.getByText("Verify sources")).toBeTruthy();
     expect(screen.getAllByText(/simulated GEN/i)).toHaveLength(3);
+  });
+
+  it("shows the immutable source snapshot separately from the live URL", () => {
+    render(<EvidencePanel steps={[{
+      ...steps[0], source_url: "https://example.test/source", source_content: "Archived source text",
+      source_content_hash: "snapshot-hash", source_snapshot_version: "firstfault-source-snapshot-v1",
+    }]} />);
+    expect(screen.getByText("snapshot-hash")).toBeTruthy();
+    expect(screen.getByText("Archived source text")).toBeTruthy();
+    expect(screen.getByText(/captured by validator consensus/i)).toBeTruthy();
   });
 
   it("shows semantic reasons and confidence for every adjudicated step", () => {

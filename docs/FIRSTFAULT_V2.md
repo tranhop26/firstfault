@@ -14,6 +14,7 @@ Studionet V1 source, manifest, address, and evidence files remain unchanged.
 | A fresh cure reopens adjudication | Old dispute timestamp can immediately satisfy timeout | A new adjudication round and timeout clock are recorded |
 | Semantic consensus is unavailable or safely times out | A cure is required to try again | Anyone may retry the same accepted evidence after the one-hour retry delay |
 | Several workers need a cure | The first cure consumes the workflow-wide slot | Each worker has one append-only cure slot; an accepted cure remains eligible across retries |
+| A Research or cure URL changes later | Adjudication sees the latest page | Submission consensus stores normalized source text, its hash, and snapshot schema; adjudication reads that immutable snapshot |
 
 Timeout calls do not transfer value. They open a new adjudication round. For an
 incomplete chain, an unsubmitted expired step is an objective breach and later
@@ -34,6 +35,8 @@ Every GEN input is converted to 18-decimal base units before a write, while
 contract readback is formatted back to GEN for display. A fresh browser can scan
 the contract's finalized incoming transaction history and reconstruct the exact
 parent plus external child-transfer proof, including partial mutual allocations.
+The evidence ledger shows the live source link separately from the source text
+and hash captured by validator consensus.
 
 ## Verification before deployment
 
@@ -53,9 +56,17 @@ Localnet at `http://127.0.0.1:4000/api`.
 V2 has not been deployed. A deployment must use a new manifest and address; it
 must never overwrite `deployments/studionet.json` or claim the V1 evidence.
 
-## Remaining trust limit
+## Source snapshot boundary
 
-Adjudication fetches the current HTTPS source at decision time. A mutable source
-can change after Research submission, so V2 still needs a content-addressed
-source snapshot design before it should be described as a complete historical
-provenance system.
+Research and cure submissions render the canonical HTTPS URL inside a
+nondeterministic block. The leader proposes normalized text and each validator
+independently fetches and requires the exact same result. Empty, oversized,
+unavailable, or consensus-divergent content is not committed. The accepted text,
+SHA-256 hash, URL, snapshot schema, actor, timestamps, and nonce are bound into
+the evidence domain. Later adjudication uses only stored snapshots and never
+re-fetches the mutable live page.
+
+This proves what validator consensus captured from that URL at submission. It
+does not prove the publisher's legal identity, a web server signature, or that
+the source was authoritative for every possible brief; those remain semantic
+and provenance-policy concerns.

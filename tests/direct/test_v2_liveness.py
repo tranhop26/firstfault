@@ -19,7 +19,12 @@ def actors(direct_alice, direct_bob, direct_charlie, direct_accounts):
 
 def deploy_v2(direct_vm, direct_deploy):
     direct_vm.warp("2023-11-14T22:13:20+00:00")
-    return direct_deploy("contracts/firstfault_v2.py")
+    contract = direct_deploy("contracts/firstfault_v2.py")
+    direct_vm.mock_web(
+        r"https://example\.test/",
+        {"status": 200, "body": "Primary source confirms the one supported claim."},
+    )
+    return contract
 
 
 def start_funded(contract, direct_vm, people, workflow_id):

@@ -52,6 +52,9 @@ export type FirstFaultStep = {
   output_text?: string;
   schema_version?: string;
   source_url?: string;
+  source_content?: string;
+  source_content_hash?: string;
+  source_snapshot_version?: string;
   submitted_at?: string;
   upstream_hash?: string;
 };
@@ -71,6 +74,9 @@ export type FirstFaultCure = {
   observed_at: string;
   submitted_at: string;
   cure_hash?: string;
+  source_content?: string;
+  source_content_hash?: string;
+  source_snapshot_version?: string;
   [key: string]: unknown;
 };
 export type FirstFaultRecovery = { workflow_id: string; cure?: Record<string, unknown>; cures?: FirstFaultCure[]; settlement?: FirstFaultSettlement };

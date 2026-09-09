@@ -21,7 +21,7 @@ describe("FirstFault browser adapter against Localnet", () => {
       await admin.request({ method: "sim_fundAccount", params: [account.address, 1_000_000] });
     }
 
-    const code = await readFile(resolve(process.cwd(), "../contracts/firstfault.py"), "utf8");
+    const code = await readFile(resolve(process.cwd(), "../contracts/firstfault_v2.py"), "utf8");
     const deployClient = createClient({ chain: localnet, endpoint, account: buyer });
     const deployHash = await deployClient.deployContract({ code, account: buyer });
     await deployClient.waitForTransactionReceipt({
@@ -60,7 +60,10 @@ describe("FirstFault browser adapter against Localnet", () => {
     adapter.updateAccount(orchestrator);
     await adapter.startWorkflow(id, `${id}-start`);
     adapter.updateAccount(researcher);
-    const research = await adapter.submitStep(id, 0, "Verified source.", "", "https://evidence.example/research/ts", BigInt(now), `${id}-research`);
+    const research = await adapter.submitStep(id, 0, "Verified source.", "", "https://test-server.genlayer.com/static/genvm/hello.html", BigInt(now), `${id}-research`);
+    expect(research.readback.source_content).toBeTruthy();
+    expect(research.readback.source_content_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(research.readback.source_snapshot_version).toBe("firstfault-source-snapshot-v1");
     adapter.updateAccount(writer);
     const writerStep = await adapter.submitStep(id, 1, "Supported draft.", research.outputHash, "", BigInt(now), `${id}-writer`);
     adapter.updateAccount(publisher);
