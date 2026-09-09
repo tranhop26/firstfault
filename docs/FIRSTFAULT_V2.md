@@ -56,6 +56,34 @@ Localnet at `http://127.0.0.1:4000/api`.
 V2 has not been deployed. A deployment must use a new manifest and address; it
 must never overwrite `deployments/studionet.json` or claim the V1 evidence.
 
+## Guarded Studionet deployment path
+
+`npm run deploy:v2` is the only repository entry point for a V2 Studionet
+deployment. It reads `contracts/firstfault_v2.py`, requires that file to be
+tracked and unchanged at the current Git commit, checks live chain ID `61999`,
+and refuses to run when `deployments/studionet-v2.json` already exists. The V2
+contract has no constructor arguments.
+
+Immediately before running the command, confirm the exact deployer wallet,
+Studionet endpoint, Git commit, normalized source SHA-256, and proposed
+transaction. Supply the key only through `GENLAYER_DEPLOYER_PRIVATE_KEY`; it is
+excluded from preflight, errors, safe logs, and the manifest. The existing
+`npm run deploy` command remains the frozen V1 path.
+
+After submission, the V2 path prints the transaction hash before waiting for
+finality. If waiting or readback is interrupted, set
+`GENLAYER_V2_DEPLOYMENT_TX_HASH` to that exact printed transaction hash and run
+`npm run deploy:v2` again. Resume mode verifies the original transaction,
+deployer, finalized successful receipt, deployed address, source, and exact
+20-method schema without submitting a second deployment.
+
+Only a successful readback writes `deployments/studionet-v2.json`. The manifest
+records the verified V1 address as predecessor, the exact source commit and
+hash, and the separately deployed V2 address and transaction. Creating this
+manifest does not enable V2 in the frontend. Live workflow evidence and a
+separately confirmed frontend deployment are required before changing the
+production contract version.
+
 ## Source snapshot boundary
 
 Research and cure submissions render the canonical HTTPS URL inside a
