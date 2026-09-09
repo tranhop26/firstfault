@@ -63,6 +63,19 @@ describe("FirstFault transaction status projection", () => {
     })).toMatchObject({ phase: "TRANSFER_PENDING" });
   });
 
+  it("shows reconstructed transfer finality to a read-only visitor", () => {
+    expect(projectTransactionStatus({
+      ...base,
+      connected: false,
+      receipt: { hash: "0xparent", statusName: "FINALIZED", executionSucceeded: true, value: "0" },
+      triggeredReceipts: [
+        { hash: "0xone", statusName: "FINALIZED", executionSucceeded: true, value: "10" },
+        { hash: "0xtwo", statusName: "FINALIZED", executionSucceeded: true, value: "20" },
+      ],
+      readback: { state: "ACCEPTED_PENDING_FINALITY", reserved: "0", payout_scheduled: "30", refund_scheduled: "0" },
+    })).toMatchObject({ phase: "SUCCESS", label: "Transfers finalized" });
+  });
+
   it("keeps errors visible even when stale readback exists", () => {
     expect(
       projectTransactionStatus({
