@@ -259,4 +259,15 @@ describe("FirstFault truthful interface", () => {
     expect(screen.getByText(/WORKFLOW NOT FOUND/i)).toBeTruthy();
     expect(screen.getByText(/2 simulated GEN/i)).toBeTruthy();
   });
+
+  it("labels a rejected payment as refunded only after child-transfer reconciliation", () => {
+    render(<FundingPanel amount="3000000000000000000" intent={null} outcome={{
+      attempt_index: "3", attempted_at: "1788534000", workflow_id: "missing", intent_id: "bad",
+      intent_version: "0", sender: steps[0].worker, received: "2000000000000000000", retained: "0",
+      refund_scheduled: "2000000000000000000", reason: "WORKFLOW_NOT_FOUND",
+      result: "REFUND_SCHEDULED", workflow_state: "MISSING",
+    }} phase="REFUND_FINALIZED" disabled={false} onPrepare={() => undefined} onFund={() => undefined} />);
+    expect(screen.getByText(/full refund finalized/i)).toBeTruthy();
+    expect(screen.getByText(/credited to the original sender/i)).toBeTruthy();
+  });
 });

@@ -10,6 +10,7 @@ export type FundingPhase =
   | "FUNDING_PENDING"
   | "FUNDING_FINALIZED"
   | "REFUND_PENDING"
+  | "REFUND_FINALIZED"
   | "SUCCESS";
 
 type FundingPanelProps = {
@@ -50,9 +51,13 @@ export function FundingPanel({ amount, intent, outcome, phase, disabled, onPrepa
       {outcome?.result === "FUNDED" && <p className="ff-funding-success">Funding confirmed by contract readback.</p>}
       {outcome?.result === "REFUND_SCHEDULED" && (
         <div className="ff-funding-refund" role="status">
-          <strong>Full refund pending</strong>
+          <strong>{phase === "REFUND_FINALIZED" ? "Full refund finalized" : "Full refund pending"}</strong>
           <span>{outcome.reason.replaceAll("_", " ")}</span>
-          <span>{formatGen(outcome.refund_scheduled)} simulated GEN scheduled to the original sender.</span>
+          <span>
+            {formatGen(outcome.refund_scheduled)} simulated GEN {phase === "REFUND_FINALIZED"
+              ? "credited to the original sender."
+              : "scheduled to the original sender."}
+          </span>
         </div>
       )}
     </section>

@@ -259,7 +259,20 @@ export function useFirstFault(workflowId: string) {
       const outcome = matches[0];
       setFundingOutcome(outcome);
       setFundingIntent({ ...fundingIntent, consumed: outcome.result === "FUNDED" });
-      setFundingPhase(outcome.result === "REFUND_SCHEDULED" ? "REFUND_PENDING" : "SUCCESS");
+      if (outcome.result === "REFUND_SCHEDULED") {
+        const refunds = await contract.getTriggeredReceipts(parent);
+        const sender = wallet.address?.toLowerCase();
+        const contractAddress = configuredAddress.toLowerCase();
+        const refundFinalized = refunds.length === 1
+          && refunds[0].statusName === "FINALIZED"
+          && refunds[0].type === 0
+          && refunds[0].from_address?.toLowerCase() === contractAddress
+          && refunds[0].to_address?.toLowerCase() === sender
+          && BigInt(refunds[0].value ?? 0) === BigInt(outcome.refund_scheduled);
+        setFundingPhase(refundFinalized ? "REFUND_FINALIZED" : "REFUND_PENDING");
+      } else {
+        setFundingPhase("SUCCESS");
+      }
       return parent;
     } catch (cause) {
       setFundingPhase("INTENT_READY");
