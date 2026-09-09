@@ -6,78 +6,126 @@
   "repository": "https://github.com/tranhop26/firstfault",
   "branch": "main",
   "rootDirectory": "frontend",
-  "deploymentCommit": "f38ea60c3a3a3fde38126c5116c53b88c970518b",
+  "deploymentId": "6S85eiff8Dwk634YTZbmzNk5pxaR",
+  "deploymentCommit": "ab67a2b7e5d4da1b315179c0ea5dd4523bea5f2f",
   "url": "https://firstfault.vercel.app",
   "environment": {
     "NEXT_PUBLIC_GENLAYER_RPC_URL": "https://studio.genlayer.com/api",
     "NEXT_PUBLIC_GENLAYER_CHAIN_ID": "61999",
-    "NEXT_PUBLIC_CONTRACT_ADDRESS": "0x2271AE904A97865491e4b24c49532f71B711eD5f"
+    "NEXT_PUBLIC_CONTRACT_ADDRESS": "0x9236A835741DF7f891613B5578753647C140124E",
+    "NEXT_PUBLIC_CONTRACT_VERSION": "v3"
   },
-  "verifiedAt": "2026-09-05T23:58:31.764Z",
+  "verifiedAt": "2026-09-09T14:17:39.4415207Z",
   "http": {
     "status": 200,
     "containsProjectTitle": true
   },
   "liveChecks": {
-    "successfulTransactionReadback": {
-      "workflowId": "firstfault-demo-20260905-1",
-      "transactionHash": "0x0580228b6382bf4d75123ff393fb975016c89cf150b6ac7b0026ebc3ce7fb084",
-      "state": "DRAFT",
-      "stepStates": ["PENDING", "PENDING", "PENDING"],
-      "stepAmounts": ["10", "10", "10"],
-      "deposited": "0",
-      "reserved": "0"
-    },
-    "importantErrorBranch": {
-      "workflowId": "missing-vercel-proof-20260905",
-      "uiState": "Workflow could not be read",
-      "retryOffered": true
-    },
-    "goldenDisputeReadback": {
-      "workflowId": "firstfault-golden-writer-breach-20260905-1",
-      "state": "DECISION_PENDING_FINALITY",
-      "outcome": "FIRST_BREACH",
-      "firstBreachStep": 1,
-      "stepStatuses": ["COMPLIANT", "MATERIAL_BREACH", "COMPLIANT"],
-      "transferProof": "Transfers finalized",
-      "parentTransactionHash": "0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9",
-      "childTransactionHashes": [
-        "0xb47500b7b0d1c819d5522e4384434be9dce304f39c947e43ca34b6e0784e326d",
-        "0xc03a8adb99a2fbeed8d924c19b3acebd89a925dec1c071366e2df4ba9fff1304",
-        "0xb01ae878c44e5a257f6c9764a0273473fba6945b1b9bb221788986109bfda1d5"
-      ],
-      "readWithoutWallet": true,
-      "observedAt": "2026-09-05T16:26:43.000Z"
-    },
-    "acceptAllReadback": {
-      "workflowId": "firstfault-live-accept-20260905-1",
+    "v3TerminalReadback": {
+      "workflowId": "firstfault-v3-funded-20260909-1",
       "state": "ACCEPTED_PENDING_FINALITY",
-      "deposited": "3",
+      "deposited": "3000000000000000000",
       "reserved": "0",
-      "payoutScheduled": "3",
-      "transferProof": "Transfers finalized",
-      "parentTransactionHash": "0x49a65263371e25c2b3cc40ce44d11c564a1d650b030ddf09ba9788839b33ba23",
-      "childTransactionHashes": [
-        "0x23b1d7065ed84e570e9c16b5ac5ba88c91d1cb200f9cabf625385a9253285c0f",
-        "0x386cbc3588c147ae194ebe089a28b994be491786afbb40fe845d324a6867ca96",
-        "0x0a5f40c761490b72de76f6fcf6fe009c4c4fcebab7c2777499490e0f6c78c9a5"
-      ],
-      "readWithoutWallet": true,
-      "observedAt": "2026-09-05T23:58:31.764Z"
-    },
-    "unresolvedReadback": {
-      "workflowId": "firstfault-live-unresolved-20260905-1",
-      "state": "UNRESOLVED",
-      "outcome": "UNRESOLVED",
-      "reason": "CONSENSUS_TIMEOUT",
-      "deposited": "3",
-      "reserved": "3",
-      "payoutScheduled": "0",
+      "payoutScheduled": "3000000000000000000",
       "refundScheduled": "0",
-      "statusLabel": "Unresolved — funds held",
-      "timeoutTransactionHash": "0xdf2b9f74f65b9e59678ecd9bcdb2594fe9d9fb3409b59dbe1f433bef4d6985e2",
+      "researchOutputHash": "84186d09dd99247312dd24a0cb1885cccf688cb70c0141a9c0f52c358ae9e202",
+      "writerOutputHash": "e57bdf62a2b2e0ac5b53b9c7c1ea32db246834fccabb7f746a536f5d9378c7de",
+      "publisherOutputHash": "e57bdf62a2b2e0ac5b53b9c7c1ea32db246834fccabb7f746a536f5d9378c7de",
+      "transferProof": "Transfers finalized",
+      "parentTransactionHash": "0x551e9c6fd802866b1bda0abdcff453f311e2d3021dc739f03df5982f7fe230ba",
+      "childTransactionHashes": [
+        "0x785e60164f8c5ed780e431756b3581686bf75457af6696db8432c45aa9b5fd7d",
+        "0x0880d0efa5d62b75f23acfeb21d774dbaf2f08233052ebaf3dbc739866912bfd",
+        "0x5927ba810a43b2f53bc1e1a90745b7befd403a4b669b39da6b4742b3b41acfb2"
+      ],
+      "finalizedTransferCount": 3,
+      "transferValueEach": "1000000000000000000",
       "readWithoutWallet": true,
-      "observedAt": "2026-09-05T23:58:31.764Z"
+      "observedAt": "2026-09-09T14:17:39.4415207Z"
+    }
+  },
+  "predecessor": {
+    "contractAddress": "0x2271AE904A97865491e4b24c49532f71B711eD5f",
+    "contractVersion": "v1",
+    "deploymentCommit": "f38ea60c3a3a3fde38126c5116c53b88c970518b",
+    "verifiedAt": "2026-09-05T23:58:31.764Z",
+    "http": {
+      "status": 200,
+      "containsProjectTitle": true
+    },
+    "liveChecks": {
+      "successfulTransactionReadback": {
+        "workflowId": "firstfault-demo-20260905-1",
+        "transactionHash": "0x0580228b6382bf4d75123ff393fb975016c89cf150b6ac7b0026ebc3ce7fb084",
+        "state": "DRAFT",
+        "stepStates": [
+          "PENDING",
+          "PENDING",
+          "PENDING"
+        ],
+        "stepAmounts": [
+          "10",
+          "10",
+          "10"
+        ],
+        "deposited": "0",
+        "reserved": "0"
+      },
+      "importantErrorBranch": {
+        "workflowId": "missing-vercel-proof-20260905",
+        "uiState": "Workflow could not be read",
+        "retryOffered": true
+      },
+      "goldenDisputeReadback": {
+        "workflowId": "firstfault-golden-writer-breach-20260905-1",
+        "state": "DECISION_PENDING_FINALITY",
+        "outcome": "FIRST_BREACH",
+        "firstBreachStep": 1,
+        "stepStatuses": [
+          "COMPLIANT",
+          "MATERIAL_BREACH",
+          "COMPLIANT"
+        ],
+        "transferProof": "Transfers finalized",
+        "parentTransactionHash": "0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9",
+        "childTransactionHashes": [
+          "0xb47500b7b0d1c819d5522e4384434be9dce304f39c947e43ca34b6e0784e326d",
+          "0xc03a8adb99a2fbeed8d924c19b3acebd89a925dec1c071366e2df4ba9fff1304",
+          "0xb01ae878c44e5a257f6c9764a0273473fba6945b1b9bb221788986109bfda1d5"
+        ],
+        "readWithoutWallet": true,
+        "observedAt": "2026-09-05T16:26:43Z"
+      },
+      "acceptAllReadback": {
+        "workflowId": "firstfault-live-accept-20260905-1",
+        "state": "ACCEPTED_PENDING_FINALITY",
+        "deposited": "3",
+        "reserved": "0",
+        "payoutScheduled": "3",
+        "transferProof": "Transfers finalized",
+        "parentTransactionHash": "0x49a65263371e25c2b3cc40ce44d11c564a1d650b030ddf09ba9788839b33ba23",
+        "childTransactionHashes": [
+          "0x23b1d7065ed84e570e9c16b5ac5ba88c91d1cb200f9cabf625385a9253285c0f",
+          "0x386cbc3588c147ae194ebe089a28b994be491786afbb40fe845d324a6867ca96",
+          "0x0a5f40c761490b72de76f6fcf6fe009c4c4fcebab7c2777499490e0f6c78c9a5"
+        ],
+        "readWithoutWallet": true,
+        "observedAt": "2026-09-05T23:58:31.764Z"
+      },
+      "unresolvedReadback": {
+        "workflowId": "firstfault-live-unresolved-20260905-1",
+        "state": "UNRESOLVED",
+        "outcome": "UNRESOLVED",
+        "reason": "CONSENSUS_TIMEOUT",
+        "deposited": "3",
+        "reserved": "3",
+        "payoutScheduled": "0",
+        "refundScheduled": "0",
+        "statusLabel": "Unresolved — funds held",
+        "timeoutTransactionHash": "0xdf2b9f74f65b9e59678ecd9bcdb2594fe9d9fb3409b59dbe1f433bef4d6985e2",
+        "readWithoutWallet": true,
+        "observedAt": "2026-09-05T23:58:31.764Z"
+      }
     }
   }
 }
