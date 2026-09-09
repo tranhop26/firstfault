@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "project": "firstfault",
+  "teamSlug": "tdh-s-projects",
+  "environment": "preview",
+  "branch": "chore/promote-v3-production",
+  "deploymentId": "Eeq3ALfjEBtq2eeCgj7YZRrNvjP8",
+  "deploymentCommit": "a66a99569504327e0c9f6b9e22e55098c2e59b7d",
+  "url": "https://firstfault-git-chore-promote-v3-production-tdh-s-projects.vercel.app/",
+  "verifiedAt": "2026-09-09T13:55:12.8948824Z",
+  "configuration": {
+    "rpcUrl": "https://studio.genlayer.com/api",
+    "chainId": 61999,
+    "contractAddress": "0x9236A835741DF7f891613B5578753647C140124E",
+    "contractVersion": "v3"
+  },
+  "http": {
+    "status": 200
+  },
+  "readback": {
+    "workflowId": "firstfault-v3-funded-20260909-1",
+    "state": "ACCEPTED_PENDING_FINALITY",
+    "deposited": "3000000000000000000",
+    "reserved": "0",
+    "payoutScheduled": "3000000000000000000",
+    "refundScheduled": "0",
+    "researchOutputHash": "84186d09dd99247312dd24a0cb1885cccf688cb70c0141a9c0f52c358ae9e202",
+    "writerOutputHash": "e57bdf62a2b2e0ac5b53b9c7c1ea32db246834fccabb7f746a536f5d9378c7de",
+    "publisherOutputHash": "e57bdf62a2b2e0ac5b53b9c7c1ea32db246834fccabb7f746a536f5d9378c7de",
+    "readWithoutWallet": true,
+    "transferProofLabel": "Transfers finalized",
+    "parentTransactionHash": "0x551e9c6fd802866b1bda0abdcff453f311e2d3021dc739f03df5982f7fe230ba",
+    "finalizedTransferCount": 3,
+    "transferValueEach": "1000000000000000000",
+    "transferTransactionHashes": [
+      "0x785e60164f8c5ed780e431756b3581686bf75457af6696db8432c45aa9b5fd7d",
+      "0x0880d0efa5d62b75f23acfeb21d774dbaf2f08233052ebaf3dbc739866912bfd",
+      "0x5927ba810a43b2f53bc1e1a90745b7befd403a4b669b39da6b4742b3b41acfb2"
+    ]
+  }
+}
