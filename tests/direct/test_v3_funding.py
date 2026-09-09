@@ -110,6 +110,26 @@ def test_nonexistent_workflow_value_is_fully_refunded_without_throwing(
     assert totals["total_rejected_funding_refund_scheduled"] == "23"
 
 
+def test_oversized_identifiers_are_safely_reduced_before_refund_outcome_storage(
+    direct_vm, direct_deploy, direct_alice
+):
+    direct_vm.warp("2023-11-14T22:13:20+00:00")
+    contract = direct_deploy("contracts/firstfault_v3.py")
+    transfers = schedule_transfers(direct_vm)
+    direct_vm.sender = direct_alice
+    direct_vm.value = 19
+
+    attempt = contract.fund_workflow("w" * 10_000, "i" * 10_000)
+    direct_vm.value = 0
+
+    outcome = json.loads(contract.get_funding_outcome(attempt))
+    assert outcome["reason"] == "INVALID_IDENTIFIER"
+    assert outcome["workflow_id"].startswith("sha256:")
+    assert outcome["intent_id"].startswith("sha256:")
+    assert outcome["refund_scheduled"] == "19"
+    assert [(item["address"].as_hex, int(item["value"])) for item in transfers] == [(to_hex(direct_alice), 19)]
+
+
 @pytest.mark.parametrize(
     ("case", "sender_kind", "intent_id", "value", "timestamp"),
     [

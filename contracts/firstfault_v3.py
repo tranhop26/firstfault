@@ -167,6 +167,7 @@ class FirstFault(gl.Contract):
     # is deliberately the same strict-expiry window used for evidence reads.
     CONSENSUS_RECOVERY_DELAY_SECONDS = MAX_OBSERVATION_AGE_SECONDS
     MAX_FUNDING_INTENT_LIFETIME_SECONDS = 3_600
+    MAX_FUNDING_IDENTIFIER_BYTES = 128
 
     # Frozen adjudication policy. A workflow's caller can supply a rejection
     # reason, but cannot replace or weaken these semantic decision rules.
@@ -892,6 +893,11 @@ class FirstFault(gl.Contract):
             attempted_at=attempted_at,
         )
 
+    def _bounded_funding_identifier(self, value: str) -> str:
+        if len(value.encode("utf-8")) <= self.MAX_FUNDING_IDENTIFIER_BYTES:
+            return value
+        return "sha256:" + self._sha256_hex(value)
+
     def _reject_funding(
         self,
         attempt_index: u256,
@@ -929,6 +935,13 @@ class FirstFault(gl.Contract):
         self.funding_attempt_count += 1
         attempt_index = self.funding_attempt_count
         now = self._submission_timestamp()
+        bounded_workflow_id = self._bounded_funding_identifier(workflow_id)
+        bounded_intent_id = self._bounded_funding_identifier(intent_id)
+        if bounded_workflow_id != workflow_id or bounded_intent_id != intent_id:
+            return self._reject_funding(
+                attempt_index, bounded_workflow_id, bounded_intent_id, u256(0),
+                "INVALID_IDENTIFIER", "UNKNOWN", now,
+            )
         intent_version = u256(0)
         if workflow_id in self.funding_intents:
             intent_version = self.funding_intents[workflow_id].version
