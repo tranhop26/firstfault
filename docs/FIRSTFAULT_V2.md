@@ -1,7 +1,8 @@
-# FirstFault V2 review candidate
+# FirstFault V2 Studionet successor
 
-`contracts/firstfault_v2.py` is an undeployed successor candidate. The verified
-Studionet V1 source, manifest, address, and evidence files remain unchanged.
+`contracts/firstfault_v2.py` is the separately deployed, intentionally frozen
+Studionet successor. The verified Studionet V1 source, manifest, address, and
+evidence files remain unchanged.
 
 ## Behavior changed
 
@@ -38,7 +39,7 @@ parent plus external child-transfer proof, including partial mutual allocations.
 The evidence ledger shows the live source link separately from the source text
 and hash captured by validator consensus.
 
-## Verification before deployment
+## Verification
 
 Run:
 
@@ -53,8 +54,15 @@ npm run build
 The browser Localnet adapter test additionally requires a running GenLayer
 Localnet at `http://127.0.0.1:4000/api`.
 
-V2 has not been deployed. A deployment must use a new manifest and address; it
-must never overwrite `deployments/studionet.json` or claim the V1 evidence.
+V2 was deployed separately at
+[`0x24c060E5394b5bD14a5546B055A7F049f9842987`](https://explorer-studio.genlayer.com/address/0x24c060E5394b5bD14a5546B055A7F049f9842987).
+Transaction
+[`0x189c6d…1db2d`](https://explorer-studio.genlayer.com/tx/0x189c6d629cde61aff8893c3d8dcc45ea9908a0a4da95d6a3b7b5b5db3fd1db2d)
+finalized successfully from deployer
+`0x21b45103dd05c43969daF3CbB4277391777e2eC7`. RPC readback matched source
+commit `e171fc108c92d3e9d346686c5f87c2e760c05aee`, normalized SHA-256
+`8bff11b1506437ef5c1ebab01ce084e0a63f57c1d78319953f19263987dc83c5`,
+and the exact 20-method schema recorded in `deployments/studionet-v2.json`.
 
 ## Guarded Studionet deployment path
 
