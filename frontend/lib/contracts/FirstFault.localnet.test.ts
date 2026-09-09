@@ -21,7 +21,7 @@ describe("FirstFault browser adapter against Localnet", () => {
       await admin.request({ method: "sim_fundAccount", params: [account.address, 1_000_000] });
     }
 
-    const code = await readFile(resolve(process.cwd(), "../contracts/firstfault_v2.py"), "utf8");
+    const code = await readFile(resolve(process.cwd(), "../contracts/firstfault_v3.py"), "utf8");
     const deployClient = createClient({ chain: localnet, endpoint, account: buyer });
     const deployHash = await deployClient.deployContract({ code, account: buyer });
     await deployClient.waitForTransactionReceipt({
@@ -35,7 +35,7 @@ describe("FirstFault browser adapter against Localnet", () => {
     expect(deployReceipt.consensus_data?.leader_receipt?.[0]?.execution_result).toBe("SUCCESS");
 
     const contractAddress = deployReceipt.to_address as `0x${string}`;
-    const adapter = new FirstFault(contractAddress, buyer, endpoint);
+    const adapter = new FirstFault(contractAddress, buyer, endpoint, undefined, "v3");
     const balance = async (address: `0x${string}`) => {
       const raw = await admin.request({ method: "eth_getBalance", params: [address, "latest"] });
       return BigInt(String(raw));
@@ -56,7 +56,11 @@ describe("FirstFault browser adapter against Localnet", () => {
       deadlines: [BigInt(now + 3600), BigInt(now + 7200), BigInt(now + 10800)],
       nonce: `${id}-create`,
     });
-    await adapter.fundWorkflow(id, `${id}-fund`, 51n);
+    await adapter.prepareFunding(id, `${id}-intent`, BigInt(now + 900), `${id}-prepare`);
+    const intent = await adapter.getFundingIntent(id);
+    expect(intent).toMatchObject({ workflow_id: id, intent_id: `${id}-intent`, expected_amount: "51", consumed: false });
+    await adapter.fundPreparedWorkflow(id, `${id}-intent`, 51n);
+    expect(await adapter.getFundingOutcome(1n)).toMatchObject({ result: "FUNDED", retained: "51", refund_scheduled: "0" });
     adapter.updateAccount(orchestrator);
     await adapter.startWorkflow(id, `${id}-start`);
     adapter.updateAccount(researcher);
@@ -94,5 +98,24 @@ describe("FirstFault browser adapter against Localnet", () => {
     expect(workerBalancesAfter.map((after, index) => after - workerBalancesBefore[index])).toEqual([11n, 17n, 23n]);
     expect(await balance(contractAddress)).toBe(0n);
     expect((await adapter.getWorkflow(id)).state).toBe("ACCEPTED_PENDING_FINALITY");
+
+    const buyerBalanceBeforeRefund = await balance(buyer.address);
+    const rejectedParent = await adapter.fundPreparedWorkflow("missing-workflow", "missing-intent", 37n);
+    const rejectedTransfers = await adapter.getTriggeredReceipts(rejectedParent);
+    expect(rejectedTransfers).toHaveLength(1);
+    expect(rejectedTransfers[0].to_address?.toLowerCase()).toBe(buyer.address.toLowerCase());
+    expect(BigInt(rejectedTransfers[0].value ?? 0)).toBe(37n);
+    expect(await adapter.getFundingOutcome(2n)).toMatchObject({
+      workflow_id: "missing-workflow", result: "REFUND_SCHEDULED", reason: "WORKFLOW_NOT_FOUND",
+      received: "37", retained: "0", refund_scheduled: "37",
+    });
+    expect((await adapter.getGlobalAccounting())).toMatchObject({
+      total_accepted_funding: "51",
+      total_rejected_funding_received: "37",
+      total_rejected_funding_refund_scheduled: "37",
+      total_workflow_payout_scheduled: "51",
+    });
+    expect(await balance(contractAddress)).toBe(0n);
+    expect((await balance(buyer.address)) - buyerBalanceBeforeRefund).toBe(0n);
   }, 1_200_000);
 });
