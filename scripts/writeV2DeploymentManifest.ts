@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { access, mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { access, link, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { EXPECTED_FIRSTFAULT_V2_METHODS } from "./v2DeploymentEvidence";
@@ -57,7 +57,7 @@ export type V2ManifestFileOps = {
     data: string,
     options: { encoding: "utf8"; flag: "wx" },
   ): Promise<void>;
-  rename(oldPath: string, newPath: string): Promise<void>;
+  link(oldPath: string, newPath: string): Promise<void>;
   rm(path: string, options: { force: true }): Promise<void>;
 };
 
@@ -65,7 +65,7 @@ const nodeFileOps: V2ManifestFileOps = {
   mkdir: (path, options) => mkdir(path, options),
   access: (path) => access(path),
   writeFile: (path, data, options) => writeFile(path, data, options),
-  rename: (oldPath, newPath) => rename(oldPath, newPath),
+  link: (oldPath, newPath) => link(oldPath, newPath),
   rm: (path, options) => rm(path, options),
 };
 
@@ -201,7 +201,8 @@ export async function writeV2DeploymentManifestAtomically(
       `${JSON.stringify(manifest, null, 2)}\n`,
       { encoding: "utf8", flag: "wx" },
     );
-    await fileOps.rename(temporaryPath, path);
+    await fileOps.link(temporaryPath, path);
+    await fileOps.rm(temporaryPath, { force: true });
   } catch (error) {
     await fileOps.rm(temporaryPath, { force: true });
     throw error;

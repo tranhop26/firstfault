@@ -59,7 +59,7 @@ function fakeFileOps(
       throw missingFileError();
     }),
     writeFile: vi.fn(async () => undefined),
-    rename: vi.fn(async () => undefined),
+    link: vi.fn(async () => undefined),
     rm: vi.fn(async () => undefined),
     ...overrides,
   };
@@ -164,9 +164,34 @@ describe("FirstFault V2 deployment manifest", () => {
     expect((await readdir(directory)).filter((name) => name.endsWith(".tmp"))).toEqual([]);
   });
 
-  test("removes the temporary file when atomic rename fails", async () => {
+  test("publishes with an exclusive link so a concurrent writer cannot replace evidence", async () => {
+    const link = vi.fn(async () => {
+      throw Object.assign(new Error("destination exists"), { code: "EEXIST" });
+    });
+    const operations = {
+      ...fakeFileOps(),
+      link,
+    };
+
+    await expect(
+      writeV2DeploymentManifestAtomically(
+        "C:/evidence/studionet-v2.json",
+        validInput(),
+        operations,
+      ),
+    ).rejects.toThrow("destination exists");
+    expect(link).toHaveBeenCalledWith(
+      expect.stringMatching(/\.tmp$/),
+      "C:/evidence/studionet-v2.json",
+    );
+    expect(operations.rm).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), {
+      force: true,
+    });
+  });
+
+  test("removes the temporary file when exclusive publication fails", async () => {
     const operations = fakeFileOps({
-      rename: vi.fn(async () => {
+      link: vi.fn(async () => {
         throw new Error("disk failure");
       }),
     });
