@@ -56,15 +56,6 @@ export function projectTransactionStatus(input: TransactionProjectionInput): Pro
     };
   }
   if (input.error) return { phase: "ERROR", label: "Action failed", detail: input.error };
-  if (!input.connected) return { phase: "DISCONNECTED", label: "Wallet not connected", detail: "Connect a wallet to submit a contract action." };
-  if (!input.correctNetwork) return { phase: "WRONG_NETWORK", label: "Wrong network", detail: "Switch to GenLayer Studionet before continuing." };
-
-  if (input.readback?.state === "UNRESOLVED") {
-    return { phase: "UNRESOLVED", label: "Unresolved — funds held", detail: `${formatGen(input.readback.reserved)} simulated GEN remains reserved by the contract.` };
-  }
-  if (input.readback && terminalSuccess.has(input.readback.state)) {
-    return { phase: "SUCCESS", label: "Settlement confirmed", detail: "The terminal contract state was reconstructed from readback." };
-  }
 
   const scheduled = input.readback
     ? BigInt(input.readback.payout_scheduled) + BigInt(input.readback.refund_scheduled)
@@ -79,6 +70,17 @@ export function projectTransactionStatus(input: TransactionProjectionInput): Pro
   if (input.receipt?.statusName === "FINALIZED" && input.receipt.executionSucceeded && scheduled > 0n && allChildrenSucceeded) {
     return { phase: "SUCCESS", label: "Transfers finalized", detail: "Every scheduled transfer finalized for the exact contract-accounted value." };
   }
+
+  if (!input.connected) return { phase: "DISCONNECTED", label: "Wallet not connected", detail: "Connect a wallet to submit a contract action." };
+  if (!input.correctNetwork) return { phase: "WRONG_NETWORK", label: "Wrong network", detail: "Switch to GenLayer Studionet before continuing." };
+
+  if (input.readback?.state === "UNRESOLVED") {
+    return { phase: "UNRESOLVED", label: "Unresolved — funds held", detail: `${formatGen(input.readback.reserved)} simulated GEN remains reserved by the contract.` };
+  }
+  if (input.readback && terminalSuccess.has(input.readback.state)) {
+    return { phase: "SUCCESS", label: "Settlement confirmed", detail: "The terminal contract state was reconstructed from readback." };
+  }
+
   if (scheduled > 0n) {
     return input.receipt?.statusName === "FINALIZED" && input.receipt.executionSucceeded
       ? { phase: "TRANSFER_PENDING", label: "Transfer pending", detail: "The parent decision finalized; child transfers still need execution proof." }
