@@ -189,10 +189,10 @@ production contract. V2 is retained as historical deployment evidence and is
 marked unsafe for production because of the live failure above. No existing V1
 or V2 state is migrated silently.
 
-The V3 manifest must bind its source commit and hash, predecessor V2, deployer,
-transaction, exact schema, explorer links, and `INTENTIONALLY_FROZEN`
-classification. Production environment changes require separate confirmation
-after all live proof gates pass.
+The immutable V3 manifest binds source commit and hash, predecessor V2,
+deployer, transaction, exact schema, explorer links, and the
+`INTENTIONALLY_FROZEN` classification. Production environment changes require
+separate confirmation after all live proof gates pass.
 
 ## Non-goals
 
