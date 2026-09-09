@@ -9,6 +9,7 @@ import { WorkflowTimeline } from "./WorkflowTimeline";
 import { VerdictPanel } from "./VerdictPanel";
 import { RecoveryPanel } from "./RecoveryPanel";
 import { EvidencePanel } from "./EvidencePanel";
+import { FundingPanel } from "./FundingPanel";
 
 afterEach(cleanup);
 
@@ -225,5 +226,37 @@ describe("FirstFault truthful interface", () => {
     fireEvent.click(screen.getByRole("button", { name: /create workflow/i }));
     view.rerender(<WorkflowComposer disabled={true} {...props} />);
     expect((screen.getByRole("button", { name: /create on studionet/i }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("requires authoritative intent readback before V3 funding", () => {
+    render(<FundingPanel amount="3000000000000000000" intent={null} outcome={null}
+      phase="READY" disabled={false} onPrepare={() => undefined} onFund={() => undefined} />);
+    expect((screen.getByRole("button", { name: /fund 3 simulated GEN/i }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: /prepare exact funding/i })).toBeTruthy();
+  });
+
+  it("shows immutable V3 intent bindings before enabling funding", () => {
+    render(<FundingPanel amount="3000000000000000000" intent={{
+      workflow_id: "demo-42", intent_id: "intent-1", buyer: steps[0].worker,
+      expected_amount: "3000000000000000000", expires_at: "1788534000", version: "7",
+      chain_id: "61999", contract_address: `0x${"9".repeat(40)}`, nonce: "prepare-1",
+      intent_hash: "abc", consumed: false,
+    }} outcome={null} phase="INTENT_READY" disabled={false}
+      onPrepare={() => undefined} onFund={() => undefined} />);
+    expect(screen.getByText(/intent-1/)).toBeTruthy();
+    expect(screen.getByText(/version 7/i)).toBeTruthy();
+    expect((screen.getByRole("button", { name: /fund 3 simulated GEN/i }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows rejected funding as a pending full refund", () => {
+    render(<FundingPanel amount="3000000000000000000" intent={null} outcome={{
+      attempt_index: "3", attempted_at: "1788534000", workflow_id: "missing", intent_id: "bad",
+      intent_version: "0", sender: steps[0].worker, received: "2000000000000000000", retained: "0",
+      refund_scheduled: "2000000000000000000", reason: "WORKFLOW_NOT_FOUND",
+      result: "REFUND_SCHEDULED", workflow_state: "MISSING",
+    }} phase="REFUND_PENDING" disabled={false} onPrepare={() => undefined} onFund={() => undefined} />);
+    expect(screen.getByText(/full refund pending/i)).toBeTruthy();
+    expect(screen.getByText(/WORKFLOW NOT FOUND/i)).toBeTruthy();
+    expect(screen.getByText(/2 simulated GEN/i)).toBeTruthy();
   });
 });

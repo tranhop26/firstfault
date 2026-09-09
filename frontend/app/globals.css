@@ -28,3 +28,8 @@
 .agent-tank-entry-label{display:table;background:#caff29;color:#01202d;border-radius:3px;padding:6px 9px;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:13px}
 @media(max-width:900px){.ff-mainbar-inner{grid-template-columns:1fr 1fr}.ff-brand-cluster{grid-column:1/-1}.ff-wallet{grid-column:auto;justify-content:flex-end}}
 @media(max-width:620px){.ff-app{overflow-x:hidden}.ff-brand-cluster{flex:0 0 100%;width:100%;justify-content:space-between;gap:8px}.agent-tank-badge{min-height:36px;padding:4px 7px 4px 5px}.agent-tank-badge .agent-tank-copy small{display:none}.agent-tank-badge .agent-tank-mark{width:25px;height:25px}.agent-tank-copy strong{font-size:9px}.ff-wallet{width:100%;margin-left:0;justify-content:flex-end}.ff-search{order:3;width:100%}.ff-hero h1{font-size:34px;overflow-wrap:anywhere}.ff-state-grid>div{min-width:0;padding:0 12px}.ff-state-grid strong{overflow-wrap:anywhere}.ff-footer-brand{flex-wrap:wrap}}
+.ff-funding-panel { margin-top: 1rem; }
+.ff-intent-readback, .ff-funding-refund { display: grid; gap: .35rem; margin: .9rem 0; padding: .8rem; border: 1px solid var(--line); border-radius: .6rem; }
+.ff-intent-readback span, .ff-funding-refund span { font-size: .82rem; overflow-wrap: anywhere; }
+.ff-funding-success { color: #1f7a4d; font-weight: 700; margin-top: .75rem; }
+.ff-funding-refund { border-color: #d39b2a; background: #fff8e8; }

@@ -185,4 +185,62 @@ describe("FirstFault triggered transfer finality", () => {
     await expect(adapter.findSettlementEvidence(workflowId)).resolves.toBeNull();
     expect(client.getTriggeredTransactionIds).not.toHaveBeenCalled();
   });
+
+  it("sends plain actor strings through the V3 create boundary", async () => {
+    const account = "0x0000000000000000000000000000000000000009" as Address;
+    const actors = [
+      "0x0000000000000000000000000000000000000011",
+      "0x0000000000000000000000000000000000000012",
+      "0x0000000000000000000000000000000000000013",
+      "0x0000000000000000000000000000000000000014",
+    ] as const;
+    const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3");
+
+    await adapter.createWorkflow({
+      workflowId: "v3-demo",
+      orchestrator: actors[0], researcher: actors[1], writer: actors[2], publisher: actors[3],
+      researchBrief: "research", writerBrief: "write", publisherBrief: "publish",
+      amounts: [1n, 2n, 3n], deadlines: [10n, 20n, 30n], nonce: "create-v3",
+    });
+
+    expect(client.writeContract).toHaveBeenCalledWith(expect.objectContaining({
+      functionName: "create_workflow",
+      args: ["v3-demo", ...actors, "research", "write", "publish", 1n, 2n, 3n, 10n, 20n, 30n, "create-v3"],
+    }));
+  });
+
+  it("uses prepare, intent readback, and the V3 payable arguments", async () => {
+    const account = "0x0000000000000000000000000000000000000009" as Address;
+    const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3");
+    client.readContract
+      .mockResolvedValueOnce(JSON.stringify({ workflow_id: "v3-demo", intent_id: "intent-1", expected_amount: "6", version: "1" }))
+      .mockResolvedValueOnce(JSON.stringify({ attempt_index: "2", result: "FUNDED", retained: "6" }))
+      .mockResolvedValueOnce(JSON.stringify({ funding_attempt_count: "2", total_accepted_funding: "6" }));
+
+    await adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1");
+    await adapter.fundPreparedWorkflow("v3-demo", "intent-1", 6n);
+    await expect(adapter.getFundingIntent("v3-demo")).resolves.toMatchObject({ version: "1" });
+    await expect(adapter.getFundingOutcome(2n)).resolves.toMatchObject({ result: "FUNDED" });
+    await expect(adapter.getGlobalAccounting()).resolves.toMatchObject({ total_accepted_funding: "6" });
+
+    expect(client.writeContract.mock.calls[0][0]).toMatchObject({
+      functionName: "prepare_funding", args: ["v3-demo", "intent-1", 2000n, "prepare-1"], value: 0n,
+    });
+    expect(client.writeContract.mock.calls[1][0]).toMatchObject({
+      functionName: "fund_workflow", args: ["v3-demo", "intent-1"], value: 6n,
+    });
+  });
+
+  it("rejects FINALIZED when GenVM execution failed", async () => {
+    const account = "0x0000000000000000000000000000000000000009" as Address;
+    client.waitForTransactionReceipt.mockResolvedValue({
+      ...parent,
+      statusName: "FINALIZED",
+      consensus_data: { leader_receipt: [{ execution_result: "ERROR" }] },
+    });
+    const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3");
+
+    await expect(adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1"))
+      .rejects.toThrow("finalized with failed execution");
+  });
 });

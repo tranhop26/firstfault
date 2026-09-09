@@ -60,6 +60,41 @@ export type FirstFaultStep = {
 };
 
 export type FirstFaultAccounting = Pick<FirstFaultWorkflow, "deposited" | "reserved" | "payout_scheduled" | "refund_scheduled" | "paid" | "refunded">;
+export type FirstFaultFundingIntent = {
+  workflow_id: string;
+  intent_id: string;
+  buyer: string;
+  expected_amount: string;
+  expires_at: string;
+  version: string;
+  chain_id: string;
+  contract_address: string;
+  nonce: string;
+  intent_hash: string;
+  consumed: boolean;
+};
+export type FirstFaultFundingOutcome = {
+  attempt_index: string;
+  attempted_at: string;
+  workflow_id: string;
+  intent_id: string;
+  intent_version: string;
+  sender: string;
+  received: string;
+  retained: string;
+  refund_scheduled: string;
+  reason: string;
+  result: "FUNDED" | "REFUND_SCHEDULED" | "REJECTED_NO_VALUE";
+  workflow_state: string;
+};
+export type FirstFaultGlobalAccounting = {
+  funding_attempt_count: string;
+  total_accepted_funding: string;
+  total_rejected_funding_received: string;
+  total_rejected_funding_refund_scheduled: string;
+  total_workflow_payout_scheduled: string;
+  total_workflow_refund_scheduled: string;
+};
 export type FirstFaultSettlement = {
   approvals?: Record<string, boolean>;
   buyer_refund: string;
@@ -135,6 +170,7 @@ export default class FirstFault {
     private account?: ContractAccount,
     private readonly endpoint?: string,
     private readonly onSubmitted?: (hash: TransactionHash) => void,
+    private readonly version: "v1" | "v2" | "v3" = "v1",
   ) {
     this.client = this.makeClient(account);
   }
@@ -174,12 +210,17 @@ export default class FirstFault {
   }
 
   async createWorkflow(input: CreateWorkflowInput) {
+    const actors = this.version === "v3"
+      ? [input.orchestrator, input.researcher, input.writer, input.publisher]
+      : [
+          asContractAddress(input.orchestrator),
+          asContractAddress(input.researcher),
+          asContractAddress(input.writer),
+          asContractAddress(input.publisher),
+        ];
     return this.write("create_workflow", [
       input.workflowId,
-      asContractAddress(input.orchestrator),
-      asContractAddress(input.researcher),
-      asContractAddress(input.writer),
-      asContractAddress(input.publisher),
+      ...actors,
       input.researchBrief,
       input.writerBrief,
       input.publisherBrief,
@@ -191,6 +232,14 @@ export default class FirstFault {
 
   async fundWorkflow(workflowId: string, nonce: string, value: bigint) {
     return this.write("fund_workflow", [workflowId, nonce], value);
+  }
+
+  async prepareFunding(workflowId: string, intentId: string, expiresAt: bigint, nonce: string) {
+    return this.write("prepare_funding", [workflowId, intentId, expiresAt, nonce]);
+  }
+
+  async fundPreparedWorkflow(workflowId: string, intentId: string, value: bigint) {
+    return this.write("fund_workflow", [workflowId, intentId], value);
   }
 
   async startWorkflow(workflowId: string, nonce: string) {
@@ -346,6 +395,24 @@ export default class FirstFault {
     const hash = (receipt.hash ?? receipt.txId) as TransactionHash | undefined;
     if (!hash) return [];
     return this.getTriggeredReceiptsByHash(hash);
+  }
+
+  async getFundingIntent(workflowId: string): Promise<FirstFaultFundingIntent> {
+    return parseContractJson<FirstFaultFundingIntent>(
+      await this.client.readContract({ address: this.contractAddress, functionName: "get_funding_intent", args: [workflowId] }),
+    );
+  }
+
+  async getFundingOutcome(attemptIndex: bigint): Promise<FirstFaultFundingOutcome> {
+    return parseContractJson<FirstFaultFundingOutcome>(
+      await this.client.readContract({ address: this.contractAddress, functionName: "get_funding_outcome", args: [attemptIndex] }),
+    );
+  }
+
+  async getGlobalAccounting(): Promise<FirstFaultGlobalAccounting> {
+    return parseContractJson<FirstFaultGlobalAccounting>(
+      await this.client.readContract({ address: this.contractAddress, functionName: "get_global_accounting", args: [] }),
+    );
   }
 
   async findSettlementEvidence(workflowId: string): Promise<SettlementEvidence | null> {

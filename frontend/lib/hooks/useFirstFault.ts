@@ -5,7 +5,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExecutionResult, TransactionStatus, type GenLayerTransaction, type TransactionHash } from "genlayer-js/types";
 import { isAddress, type Address } from "viem";
 
-import FirstFault, { type CreateWorkflowInput } from "@/lib/contracts/FirstFault";
+import FirstFault, {
+  type CreateWorkflowInput,
+  type FirstFaultFundingIntent,
+  type FirstFaultFundingOutcome,
+} from "@/lib/contracts/FirstFault";
+import type { FundingPhase } from "@/components/firstfault/FundingPanel";
 import { getContractAddress, getContractVersion } from "@/lib/genlayer/client";
 import { useWallet } from "@/lib/genlayer/WalletProvider";
 import { projectTransactionStatus, type TransactionEvidence } from "@/lib/firstfault/status";
@@ -49,13 +54,17 @@ export function useFirstFault(workflowId: string) {
         const storage = getReconciliationStorage(window);
         if (storage) writeReconciliationHash(storage, reconciliationKey, hash);
       },
+      contractVersion,
     ) : null,
-    [configured, configuredAddress, reconciliationKey, wallet.address],
+    [configured, configuredAddress, contractVersion, reconciliationKey, wallet.address],
   );
   const [receipt, setReceipt] = useState<TransactionEvidence | null>(null);
   const [children, setChildren] = useState<TransactionEvidence[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [fundingIntent, setFundingIntent] = useState<FirstFaultFundingIntent | null>(null);
+  const [fundingOutcome, setFundingOutcome] = useState<FirstFaultFundingOutcome | null>(null);
+  const [fundingPhase, setFundingPhase] = useState<FundingPhase>("READY");
 
   const enabled = Boolean(contract && workflowId.trim());
   const workflowQuery = useQuery({
@@ -82,6 +91,27 @@ export function useFirstFault(workflowId: string) {
     enabled,
     retry: false,
   });
+
+  useEffect(() => {
+    setFundingIntent(null);
+    setFundingOutcome(null);
+    setFundingPhase("READY");
+  }, [configuredAddress, workflowId]);
+
+  useEffect(() => {
+    if (!contract || contractVersion !== "v3" || workflowQuery.data?.state !== "DRAFT" || fundingIntent) return;
+    let active = true;
+    contract.getFundingIntent(workflowId)
+      .then((intent) => {
+        if (!active || intent.workflow_id !== workflowId) return;
+        setFundingIntent(intent);
+        setFundingPhase("INTENT_READY");
+      })
+      .catch(() => {
+        // A DRAFT without an intent is the normal pre-prepare state.
+      });
+    return () => { active = false; };
+  }, [contract, contractVersion, fundingIntent, workflowId, workflowQuery.data?.state]);
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ["firstfault", configuredAddress, workflowId] });
@@ -177,6 +207,66 @@ export function useFirstFault(workflowId: string) {
     submitted,
   });
 
+  const prepareFunding = async (expectedAmount: bigint) => {
+    if (!contract) throw new Error("Contract is not configured");
+    const intentId = nonce("intent");
+    setFundingPhase("PREPARING_FUNDING");
+    try {
+      const expiresAt = BigInt(Math.floor(Date.now() / 1000) + 900);
+      const parent = await run(() => contract.prepareFunding(workflowId, intentId, expiresAt, nonce("prepare")));
+      const intent = await contract.getFundingIntent(workflowId);
+      if (
+        intent.workflow_id !== workflowId
+        || intent.intent_id !== intentId
+        || BigInt(intent.expected_amount) !== expectedAmount
+        || intent.consumed
+      ) {
+        throw new Error("Funding intent readback does not match the prepared action");
+      }
+      setFundingIntent(intent);
+      setFundingOutcome(null);
+      setFundingPhase("INTENT_READY");
+      return parent;
+    } catch (cause) {
+      setFundingPhase("READY");
+      throw cause;
+    }
+  };
+
+  const fund = async (value: bigint) => {
+    if (!contract) throw new Error("Contract is not configured");
+    if (contractVersion !== "v3") return run(() => contract.fundWorkflow(workflowId, nonce("fund"), value));
+    if (!fundingIntent || fundingIntent.consumed || BigInt(fundingIntent.expected_amount) !== value) {
+      throw new Error("Prepare and verify the exact funding intent before sending value");
+    }
+    setFundingPhase("FUNDING_PENDING");
+    try {
+      const before = await contract.getGlobalAccounting();
+      const parent = await run(() => contract.fundPreparedWorkflow(workflowId, fundingIntent.intent_id, value));
+      setFundingPhase("FUNDING_FINALIZED");
+      const after = await contract.getGlobalAccounting();
+      const matches: FirstFaultFundingOutcome[] = [];
+      for (let index = BigInt(before.funding_attempt_count) + 1n; index <= BigInt(after.funding_attempt_count); index += 1n) {
+        const candidate = await contract.getFundingOutcome(index);
+        if (
+          candidate.workflow_id === workflowId
+          && candidate.intent_id === fundingIntent.intent_id
+          && candidate.sender.toLowerCase() === wallet.address?.toLowerCase()
+          && candidate.received === value.toString()
+        ) matches.push(candidate);
+      }
+      if (matches.length !== 1) throw new Error("Unable to bind the funding transaction to one authoritative outcome");
+      const outcome = matches[0];
+      setFundingOutcome(outcome);
+      setFundingIntent({ ...fundingIntent, consumed: outcome.result === "FUNDED" });
+      setFundingPhase(outcome.result === "REFUND_SCHEDULED" ? "REFUND_PENDING" : "SUCCESS");
+      return parent;
+    } catch (cause) {
+      setFundingPhase("INTENT_READY");
+      throw cause;
+    }
+  };
+
   return {
     wallet,
     configured,
@@ -186,6 +276,9 @@ export function useFirstFault(workflowId: string) {
     steps: stepsQuery.data ?? [],
     accounting: accountingQuery.data ?? null,
     recovery: recoveryQuery.data ?? null,
+    fundingIntent,
+    fundingOutcome,
+    fundingPhase,
     loading: workflowQuery.isLoading || stepsQuery.isLoading || accountingQuery.isLoading || recoveryQuery.isLoading,
     readError: workflowQuery.error instanceof Error ? workflowQuery.error.message : null,
     actionPending: mutation.isPending,
@@ -194,7 +287,8 @@ export function useFirstFault(workflowId: string) {
     childHashes: children.map((child) => child.hash).filter(Boolean),
     refresh,
     create: (input: CreateWorkflowInput) => run(() => contract!.createWorkflow(input)),
-    fund: (value: bigint) => run(() => contract!.fundWorkflow(workflowId, nonce("fund"), value)),
+    prepareFunding,
+    fund,
     start: () => run(() => contract!.startWorkflow(workflowId, nonce("start"))),
     submitStep: (stepIndex: number, output: string, upstreamHash: string, sourceUrl: string) =>
       run(async () => (await contract!.submitStep(workflowId, stepIndex, output, upstreamHash, sourceUrl, BigInt(Math.floor(Date.now() / 1000)), nonce(`step-${stepIndex}`))).receipt),
