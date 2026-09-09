@@ -6,7 +6,7 @@ import { ExecutionResult, TransactionStatus, type GenLayerTransaction, type Tran
 import { isAddress, type Address } from "viem";
 
 import FirstFault, { type CreateWorkflowInput } from "@/lib/contracts/FirstFault";
-import { getContractAddress } from "@/lib/genlayer/client";
+import { getContractAddress, getContractVersion } from "@/lib/genlayer/client";
 import { useWallet } from "@/lib/genlayer/WalletProvider";
 import { projectTransactionStatus, type TransactionEvidence } from "@/lib/firstfault/status";
 import {
@@ -37,10 +37,20 @@ export function useFirstFault(workflowId: string) {
   const wallet = useWallet();
   const queryClient = useQueryClient();
   const configuredAddress = getContractAddress();
+  const contractVersion = getContractVersion();
   const configured = isAddress(configuredAddress);
+  const reconciliationKey = `firstfault:parent:${configuredAddress.toLowerCase()}:${workflowId.trim()}`;
   const contract = useMemo(
-    () => configured ? new FirstFault(configuredAddress as Address, wallet.address as Address | undefined) : null,
-    [configured, configuredAddress, wallet.address],
+    () => configured ? new FirstFault(
+      configuredAddress as Address,
+      wallet.address as Address | undefined,
+      undefined,
+      (hash) => {
+        const storage = getReconciliationStorage(window);
+        if (storage) writeReconciliationHash(storage, reconciliationKey, hash);
+      },
+    ) : null,
+    [configured, configuredAddress, reconciliationKey, wallet.address],
   );
   const [receipt, setReceipt] = useState<TransactionEvidence | null>(null);
   const [children, setChildren] = useState<TransactionEvidence[]>([]);
@@ -48,7 +58,6 @@ export function useFirstFault(workflowId: string) {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const enabled = Boolean(contract && workflowId.trim());
-  const reconciliationKey = `firstfault:parent:${configuredAddress.toLowerCase()}:${workflowId.trim()}`;
   const workflowQuery = useQuery({
     queryKey: ["firstfault", configuredAddress, workflowId, "workflow"],
     queryFn: () => contract!.getWorkflow(workflowId),
@@ -64,6 +73,12 @@ export function useFirstFault(workflowId: string) {
   const accountingQuery = useQuery({
     queryKey: ["firstfault", configuredAddress, workflowId, "accounting"],
     queryFn: () => contract!.getAccounting(workflowId),
+    enabled,
+    retry: false,
+  });
+  const recoveryQuery = useQuery({
+    queryKey: ["firstfault", configuredAddress, workflowId, "recovery"],
+    queryFn: () => contract!.getRecovery(workflowId),
     enabled,
     retry: false,
   });
@@ -105,6 +120,27 @@ export function useFirstFault(workflowId: string) {
     };
   }, [configuredAddress, contract, enabled, queryClient, reconciliationKey, workflowId]);
 
+  useEffect(() => {
+    if (!contract || !enabled || receipt || submitted) return;
+    const scheduled = workflowQuery.data
+      ? BigInt(workflowQuery.data.payout_scheduled) + BigInt(workflowQuery.data.refund_scheduled)
+      : 0n;
+    if (scheduled === 0n) return;
+    const storage = getReconciliationStorage(window);
+    if (storage && readReconciliationHash(storage, reconciliationKey)) return;
+    let active = true;
+    contract.findSettlementEvidence(workflowId)
+      .then((proof) => {
+        if (!active || !proof) return;
+        setReceipt(evidence(proof.parent));
+        setChildren(proof.children.map(evidence));
+      })
+      .catch(() => {
+        // Readback stays visible; status reports that receipt proof is unavailable.
+      });
+    return () => { active = false; };
+  }, [contract, enabled, receipt, reconciliationKey, submitted, workflowId, workflowQuery.data]);
+
   const mutation = useMutation({
     mutationFn: async (action: () => Promise<GenLayerTransaction>) => {
       if (!contract) throw new Error("NEXT_PUBLIC_CONTRACT_ADDRESS is not configured with a valid deployed address.");
@@ -145,10 +181,12 @@ export function useFirstFault(workflowId: string) {
     wallet,
     configured,
     configuredAddress,
+    contractVersion,
     workflow,
     steps: stepsQuery.data ?? [],
     accounting: accountingQuery.data ?? null,
-    loading: workflowQuery.isLoading || stepsQuery.isLoading || accountingQuery.isLoading,
+    recovery: recoveryQuery.data ?? null,
+    loading: workflowQuery.isLoading || stepsQuery.isLoading || accountingQuery.isLoading || recoveryQuery.isLoading,
     readError: workflowQuery.error instanceof Error ? workflowQuery.error.message : null,
     actionPending: mutation.isPending,
     status,
@@ -165,5 +203,12 @@ export function useFirstFault(workflowId: string) {
     adjudicate: () => run(() => contract!.adjudicate(workflowId, nonce("adjudicate"))),
     cancel: () => run(() => contract!.cancelWorkflow(workflowId, nonce("cancel"))),
     timeout: () => run(() => contract!.timeoutToUnresolved(workflowId, nonce("timeout"))),
+    timeoutIncomplete: () => run(() => contract!.timeoutIncompleteToUnresolved(workflowId, nonce("timeout-incomplete"))),
+    timeoutReview: () => run(() => contract!.timeoutReviewToUnresolved(workflowId, nonce("timeout-review"))),
+    retryAdjudication: () => run(() => contract!.retryAdjudication(workflowId, nonce("retry-adjudication"))),
+    submitCure: (evidenceText: string, sourceUrl: string) => run(() => contract!.submitCure(workflowId, evidenceText, sourceUrl, BigInt(Math.floor(Date.now() / 1000)), nonce("cure"))),
+    proposeSettlement: (amounts: readonly [bigint, bigint, bigint, bigint]) => run(() => contract!.proposeMutualSettlement(workflowId, amounts, nonce("proposal"))),
+    approveSettlement: (version: bigint, hash: string) => run(() => contract!.approveMutualSettlement(workflowId, version, hash, nonce("approval"))),
+    executeSettlement: () => run(() => contract!.executeMutualSettlement(workflowId, nonce("execute-settlement"))),
   };
 }

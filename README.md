@@ -24,7 +24,8 @@ contracts/firstfault.py
 authoritative workflow, accounting, recovery and transfer state
 ```
 
-- `contracts/firstfault.py` — frozen Intelligent Contract and source of truth.
+- `contracts/firstfault.py` — deployed, frozen V1 Intelligent Contract and source of truth.
+- `contracts/firstfault_v2.py` — undeployed review candidate with deadline and recovery fixes; see [docs/FIRSTFAULT_V2.md](docs/FIRSTFAULT_V2.md).
 - `tests/direct/` — authorization, transitions, evidence, adjudication, custody, replay, refund, and recovery tests.
 - `tests/integration/` — real Localnet consensus and balance-conservation flows.
 - `frontend/` — responsive wallet interface with separate disconnected, pending, finalized, success, error, and readback states.
@@ -64,6 +65,7 @@ Copy `.env.example` for deployment/local operation and `frontend/.env.example` t
 | `NEXT_PUBLIC_GENLAYER_RPC_URL` | Browser RPC |
 | `NEXT_PUBLIC_GENLAYER_CHAIN_ID` | Studionet chain ID `61999` |
 | `NEXT_PUBLIC_CONTRACT_ADDRESS` | Address copied only from verified `deployments/studionet.json` |
+| `NEXT_PUBLIC_CONTRACT_VERSION` | `v1` by default; use `v2` only with a separately verified V2 address |
 
 An empty contract address is intentional before deployment. The frontend reports that live interaction is unavailable; it does not substitute mock contract data.
 

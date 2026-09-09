@@ -1,3 +1,5 @@
+import { formatGen } from "./amounts";
+
 export type ContractReadback = {
   state: string;
   reserved: string;
@@ -58,7 +60,7 @@ export function projectTransactionStatus(input: TransactionProjectionInput): Pro
   if (!input.correctNetwork) return { phase: "WRONG_NETWORK", label: "Wrong network", detail: "Switch to GenLayer Studionet before continuing." };
 
   if (input.readback?.state === "UNRESOLVED") {
-    return { phase: "UNRESOLVED", label: "Unresolved — funds held", detail: `${input.readback.reserved} simulated GEN remains reserved by the contract.` };
+    return { phase: "UNRESOLVED", label: "Unresolved — funds held", detail: `${formatGen(input.readback.reserved)} simulated GEN remains reserved by the contract.` };
   }
   if (input.readback && terminalSuccess.has(input.readback.state)) {
     return { phase: "SUCCESS", label: "Settlement confirmed", detail: "The terminal contract state was reconstructed from readback." };
