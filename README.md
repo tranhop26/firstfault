@@ -65,9 +65,18 @@ Copy `.env.example` for deployment/local operation and `frontend/.env.example` t
 | `NEXT_PUBLIC_GENLAYER_RPC_URL` | Browser RPC |
 | `NEXT_PUBLIC_GENLAYER_CHAIN_ID` | Studionet chain ID `61999` |
 | `NEXT_PUBLIC_CONTRACT_ADDRESS` | Address copied from the verified manifest for the selected contract version |
-| `NEXT_PUBLIC_CONTRACT_VERSION` | `v1` by default; use `v2` only with a separately verified V2 address |
+| `NEXT_PUBLIC_CONTRACT_VERSION` | Adapter version matching the deployed address: `v1`, `v2`, or `v3` |
 
 An empty contract address is intentional before deployment. The frontend reports that live interaction is unavailable; it does not substitute mock contract data.
+
+The active production build uses:
+
+```text
+NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api
+NEXT_PUBLIC_GENLAYER_CHAIN_ID=61999
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x9236A835741DF7f891613B5578753647C140124E
+NEXT_PUBLIC_CONTRACT_VERSION=v3
+```
 
 ## Test and build
 
@@ -104,7 +113,16 @@ FirstFault V3 is deployed at [`0x9236A835741DF7f891613B5578753647C140124E`](http
 
 ## Live application
 
-Production: [https://firstfault.vercel.app](https://firstfault.vercel.app). Vercel deployment `6S85eiff8Dwk634YTZbmzNk5pxaR` serves application commit `ab67a2b7e5d4da1b315179c0ea5dd4523bea5f2f` from `main`, with `frontend` as the root directory and V3 contract `0x9236A835741DF7f891613B5578753647C140124E`. The live application returned HTTP 200 and reconstructed workflow `firstfault-v3-funded-20260909-1` without a connected wallet, including all three finalized transfer links for the exact contract-accounted value. Machine-readable production and rollback evidence is recorded in `deployments/vercel.json`.
+Production: [https://firstfault.vercel.app](https://firstfault.vercel.app). It serves the V3 contract [`0x9236A835741DF7f891613B5578753647C140124E`](https://explorer-studio.genlayer.com/address/0x9236A835741DF7f891613B5578753647C140124E) from `main`, with `frontend` as the Vercel root directory. The current runtime includes the Studionet receipt compatibility fix merged in `68d9b89a708daf7ae547a9b998f58e981d3a0b3a`, and the canonical URL returned HTTP 200 during the final verification. Machine-readable production, rollback, and dispute evidence is recorded in `deployments/vercel.json` and `deployments/studionet-v3-dispute-evidence.json`.
+
+### Judge demo — no wallet required
+
+1. Open [FirstFault Production](https://firstfault.vercel.app).
+2. Paste `firstfault-v3-writer-breach-20260910-1` into **Workflow ID**.
+3. Select **Inspect case**.
+4. Confirm `FIRST_BREACH`, **Earliest material breach: step 2** (Writer), and **Transfers finalized** with one parent and three child transaction links.
+
+This workflow holds 1 simulated GEN for each of Research, Writing, and Publishing. Research is `COMPLIANT`; Writer is `MATERIAL_BREACH` for inventing an unsupported audience metric; Publisher is `COMPLIANT` because its brief required exact reproduction. The contract scheduled 1 simulated GEN to Researcher, 1 to Publisher, and the Writer hold back to Buyer. All three transfers finalized with credited value, and the contract balance returned to zero.
 
 ## Golden Studionet dispute
 
@@ -153,17 +171,18 @@ The resumed receipt must identify the same transaction hash before evidence can 
 | Buyer | Open concrete source-backed rejection | `open_dispute` | [`0xe954b0…f26998`](https://explorer-studio.genlayer.com/tx/0xe954b0505fcdf06213ce696905db55a3330edf9404818d9a66add75e94f26998) | `FINALIZED` / `SUCCESS` | Workflow becomes `DISPUTED`; all 51 remains reserved |
 | Buyer and validators | Determine first material breach | `adjudicate` | [`0x1a785c…717fc9`](https://explorer-studio.genlayer.com/tx/0x1a785cd36e5c9ae8bdb0839d47d9554587a3066a301f58478ac8d69b7f717fc9) | `FINALIZED` / `SUCCESS`; 3 agree, 1 disagree, 1 idle | `FIRST_BREACH`, step `1`; 34 payout + 17 refund scheduled, reserved 0 |
 | Contract | Execute adjudication value consequence | Triggered external transfers | [`17 refund`](https://explorer-studio.genlayer.com/tx/0xb47500b7b0d1c819d5522e4384434be9dce304f39c947e43ca34b6e0784e326d), [`11 payout`](https://explorer-studio.genlayer.com/tx/0xc03a8adb99a2fbeed8d924c19b3acebd89a925dec1c071366e2df4ba9fff1304), [`23 payout`](https://explorer-studio.genlayer.com/tx/0xb01ae878c44e5a257f6c9764a0273473fba6945b1b9bb221788986109bfda1d5) | All `FINALIZED`, value credited | Exact recipients and values total 51; contract balance reads 0 |
+| V3 Buyer and validators | Decide the current production demo dispute | `adjudicate` | [`0xd3fecd…f4f512`](https://explorer-studio.genlayer.com/tx/0xd3fecdeafbb30c7382a32dced6f8eab2438aa90e4eba25565cc24047def4f512) | `FINALIZED` / `MAJORITY_AGREE`; 3 agree, 2 disagree | `FIRST_BREACH`, Writer at step index `1`; 2 simulated GEN payout + 1 refund scheduled, reserved 0 |
+| V3 contract | Execute the production-demo settlement | Triggered external transfers | [`Research payout`](https://explorer-studio.genlayer.com/tx/0xa7dc45c69507f18dbec622493ca81b57b6831d71d09934c223bef4b8489db671), [`Publisher payout`](https://explorer-studio.genlayer.com/tx/0xc0c607bcccff569ac847a95817477956b513fd3d1456357d606ce28f0dc8bbb1), [`Writer-hold refund`](https://explorer-studio.genlayer.com/tx/0x689368c746f8afe06c637a7e47cd64fe0c0d026392f038bde5711c81a9f4949a) | All `FINALIZED`, value credited | Three transfers of 1 simulated GEN total the 3 GEN deposit; contract balance reads 0 |
 | Buyer after timeout | Preserve custody safely | `timeout_dispute_to_unresolved` | [`0xdf2b9f…6985e2`](https://explorer-studio.genlayer.com/tx/0xdf2b9f74f65b9e59678ecd9bcdb2594fe9d9fb3409b59dbe1f433bef4d6985e2) | `FINALIZED` / `SUCCESS` | `UNRESOLVED / CONSENSUS_TIMEOUT`; all 3 remains reserved, no payout/refund |
 
-Machine-readable deployment and exercised-flow evidence is recorded in `deployments/studionet.json`, `deployments/studionet-v2.json`, `deployments/studionet-v3.json`, `deployments/studionet-evidence.json`, `deployments/studionet-golden-demo.json`, `deployments/studionet-live-branches.json`, and `deployments/vercel.json`.
+Machine-readable deployment and exercised-flow evidence is recorded in `deployments/studionet.json`, `deployments/studionet-v2.json`, `deployments/studionet-v3.json`, `deployments/studionet-evidence.json`, `deployments/studionet-golden-demo.json`, `deployments/studionet-live-branches.json`, `deployments/studionet-v3-live-evidence.json`, `deployments/studionet-v3-dispute-evidence.json`, and `deployments/vercel.json`.
 
 ## Known limitations
 
-- V1 is frozen; replacing faulty behavior requires a separately deployed and reviewed successor. Existing holds cannot be silently migrated.
+- Every deployed version is intentionally frozen; changing behavior requires a separately deployed and reviewed successor. Existing holds cannot be silently migrated.
 - `UNRESOLVED` deliberately retains reserved value until a contract-governed recovery path succeeds.
 - Localnet and Studionet activity demonstrates development behavior, not production-value settlement.
-- V3 deployment source and schema are verified, but its promoted custody branches do not yet have fixed live Studionet evidence and the production frontend still uses V1.
-- Contract accounting deliberately distinguishes scheduled value from external transfer finality. `paid` and `refunded` remain zero in V1; finalized child receipts with `valueCredited=true` are the execution proof, while the contract ledger records the exact scheduled amounts and recipients.
+- Contract accounting deliberately distinguishes scheduled value from external transfer finality. The contract ledger records exact scheduled amounts and recipients; finalized child receipts with `valueCredited=true` are the execution proof surfaced by the frontend.
 
 ## License
 
