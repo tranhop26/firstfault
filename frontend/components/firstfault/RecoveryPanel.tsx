@@ -25,7 +25,7 @@ export function RecoveryPanel({ workflowId, reserved, unresolvedReason, canCure,
   }
   const allocationTotal = parsedAmounts?.reduce((total, amount) => total + amount, 0n);
   const allocationMatches = allocationTotal === BigInt(reserved) && Boolean(parsedAmounts?.every((amount) => amount >= 0n));
-  return <section className="ff-panel ff-recovery">
+  return <section className="ff-panel ff-recovery" id="recovery">
     <div className="ff-section-head"><div><span className="ff-eyebrow">Contract recovery</span><h2>Resolve held value</h2></div><span className="ff-trust-chip">{workflowId}</span></div>
     <p>A cure adds source-bound evidence. A mutual settlement moves value only after every workflow role approves the exact proposal.</p>
     {recovery?.cures?.length ? <p>{recovery.cures.length} worker cure{recovery.cures.length === 1 ? "" : "s"} recorded for this workflow.</p> : null}

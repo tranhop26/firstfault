@@ -2,7 +2,7 @@ import type { FirstFaultWorkflow } from "@/lib/contracts/FirstFault";
 
 export function VerdictPanel({ workflow }: { workflow: FirstFaultWorkflow }) {
   return (
-    <section className="ff-panel ff-verdict">
+    <section className="ff-panel ff-verdict" id="disputes">
       <div className="ff-section-head"><div><span className="ff-eyebrow">GenLayer decision</span><h2>First-fault verdict</h2></div>{workflow.outcome && <span className="ff-trust-chip">Consensus result</span>}</div>
       {!workflow.verdict ? <div className="ff-empty"><span>⚖</span><strong>No verdict yet</strong><p>The buyer cannot choose the outcome. GenLayer evaluates the bound evidence after a dispute.</p></div> : (
         <div className="ff-verdict-body">

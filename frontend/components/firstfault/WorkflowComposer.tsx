@@ -51,7 +51,7 @@ export function WorkflowComposer({ disabled, onCreate, status, parentHash, child
         {(["research", "writing", "publishing"] as const).map((name) => <label className="ff-form-wide" key={name}>{name[0].toUpperCase() + name.slice(1)} brief<textarea value={form[name]} onChange={(e) => set(name, e.target.value)} /></label>)}
         {(["researchAmount", "writerAmount", "publisherAmount"] as const).map((name) => <label key={name}>{name.replace("Amount", " hold")}<input type="number" min="1" value={form[name]} onChange={(e) => set(name, e.target.value)} /></label>)}
         {([['researchHours','Research deadline hours'],['writerHours','Writer deadline hours'],['publisherHours','Publisher deadline hours']] as const).map(([name,label]) => <label key={name}>{label}<input aria-label={label} type="number" min="0.25" step="0.25" value={form[name]} onChange={(e) => set(name, e.target.value)} /></label>)}
-        <p className="ff-form-wide">Deadlines are measured from the time you sign. V2 gives the buyer 24 hours to review after the Publisher submission.</p>
+        <p className="ff-form-wide ff-form-help">Deadlines are measured from the time you sign. The buyer receives 24 hours to review after the Publisher submission.</p>
       </div>
       {formError && <p className="ff-config-error" role="alert">{formError}</p>}
       {status.phase !== "READY" && <TransactionStatus status={status} parentHash={parentHash} childHashes={childHashes} />}
