@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 1,
+  "project": "FirstFault",
+  "contractVersion": "v3",
+  "network": "studionet",
+  "chainId": 61999,
+  "contractAddress": "0x9236A835741DF7f891613B5578753647C140124E",
+  "contractSourceCommit": "6e4b3b8a632ee519d571674af0b5e64bfc6d74e1",
+  "contractSourceSha256": "7164c7edf6bd2def6dce69615b4acce0f8899ffa7fa094b8cd59f6c1df426617",
+  "observedAt": "2026-09-10T13:28:29.314Z",
+  "workflowId": "firstfault-v3-writer-breach-20260910-1",
+  "actors": {
+    "buyer": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "orchestrator": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "researcher": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "writer": "0x5d39d3243F7372d08ae83983f1Eb8663d121435A",
+    "publisher": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2"
+  },
+  "readback": {
+    "state": "DECISION_PENDING_FINALITY",
+    "outcome": "FIRST_BREACH",
+    "deposited": "3000000000000000000",
+    "reserved": "0",
+    "payoutScheduled": "2000000000000000000",
+    "refundScheduled": "1000000000000000000",
+    "paid": "0",
+    "refunded": "0",
+    "rejectionReason": "The final publication contains a 250,000 weekly-user metric that is absent from the bound IANA source and contradicts the Writer MUST brief."
+  },
+  "steps": [
+    {
+      "stepIndex": 0,
+      "role": "researcher",
+      "worker": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "state": "PAYOUT_SCHEDULED",
+      "amount": "1000000000000000000",
+      "brief": "MUST summarize the IANA example-domains page and state whether it reports audience metrics.",
+      "briefHash": "193bfbd513028200c700b47871b566f93e244c3827521047a500d4675c3fb3fe",
+      "outputText": "IANA reserves example.com, example.net, and example.org for documentation. The cited page does not report audience metrics.",
+      "outputHash": "84186d09dd99247312dd24a0cb1885cccf688cb70c0141a9c0f52c358ae9e202",
+      "upstreamHash": "",
+      "evidenceHash": "2f8cb49d58f3c82ea606e12e4557d6f9e4534a701d2beebc1ac5d06a331de05a",
+      "sourceUrl": "https://www.iana.org/help/example-domains",
+      "sourceContentHash": "6df12620d6e1c1029a1534fc0b2e0eba7107db6daba73f6ae8e52f32386c340a",
+      "sourceSnapshotVersion": "firstfault-source-snapshot-v1",
+      "schemaVersion": "firstfault-evidence-v2"
+    },
+    {
+      "stepIndex": 1,
+      "role": "writer",
+      "worker": "0x5d39d3243F7372d08ae83983f1Eb8663d121435A",
+      "state": "REFUND_SCHEDULED",
+      "amount": "1000000000000000000",
+      "brief": "MUST use only claims supported by the Research output and MUST NOT invent audience, traffic, or adoption metrics.",
+      "briefHash": "07defe156d6c8155e2c759cf1ccb0a13f03698f3e9d4006b9522b826e98b0c0f",
+      "outputText": "Example domains reached 250,000 users in one week.",
+      "outputHash": "d9a9e1252c212666559ce0566ac712924aa768b9ca3dbde67349b2dc8362651e",
+      "upstreamHash": "84186d09dd99247312dd24a0cb1885cccf688cb70c0141a9c0f52c358ae9e202",
+      "evidenceHash": "82770d7abda5d0a5942dee324dc33c831375771195f02d97e16392930752783e",
+      "sourceUrl": "",
+      "sourceContentHash": "",
+      "sourceSnapshotVersion": "",
+      "schemaVersion": "firstfault-evidence-v2"
+    },
+    {
+      "stepIndex": 2,
+      "role": "publisher",
+      "worker": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2",
+      "state": "PAYOUT_SCHEDULED",
+      "amount": "1000000000000000000",
+      "brief": "MUST reproduce the Writer artifact exactly without adding, removing, correcting, or independently asserting any claim.",
+      "briefHash": "f66f236660a928cdf3a9a61bbab875755106b85e62e616665c63c6294f8abb9d",
+      "outputText": "Example domains reached 250,000 users in one week.",
+      "outputHash": "d9a9e1252c212666559ce0566ac712924aa768b9ca3dbde67349b2dc8362651e",
+      "upstreamHash": "d9a9e1252c212666559ce0566ac712924aa768b9ca3dbde67349b2dc8362651e",
+      "evidenceHash": "73558c449f9bb4f5753a837e2f5b6fc383d34b27acbbbd1a75f91c32e49fee45",
+      "sourceUrl": "",
+      "sourceContentHash": "",
+      "sourceSnapshotVersion": "",
+      "schemaVersion": "firstfault-evidence-v2"
+    }
+  ],
+  "verdict": {
+    "outcome": "FIRST_BREACH",
+    "firstBreachStep": 1,
+    "stepStatuses": [
+      "COMPLIANT",
+      "MATERIAL_BREACH",
+      "COMPLIANT"
+    ],
+    "evidenceCited": 3,
+    "citedEvidenceHashes": [
+      "2f8cb49d58f3c82ea606e12e4557d6f9e4534a701d2beebc1ac5d06a331de05a",
+      "82770d7abda5d0a5942dee324dc33c831375771195f02d97e16392930752783e",
+      "73558c449f9bb4f5753a837e2f5b6fc383d34b27acbbbd1a75f91c32e49fee45"
+    ],
+    "reasons": [
+      {
+        "stepIndex": 0,
+        "confidence": "HIGH",
+        "material": false,
+        "causal": false,
+        "reason": "Research correctly summarized the source and stated that no audience metrics were reported."
+      },
+      {
+        "stepIndex": 1,
+        "confidence": "HIGH",
+        "material": true,
+        "causal": true,
+        "reason": "Writer violated the MUST NOT requirement by inventing a 250,000 weekly-user metric not supported by the Research output, which directly caused the buyer's rejection."
+      },
+      {
+        "stepIndex": 2,
+        "confidence": "HIGH",
+        "material": false,
+        "causal": false,
+        "reason": "Publisher exactly reproduced the Writer artifact as required."
+      }
+    ]
+  },
+  "lifecycleTransactions": {
+    "createWorkflow": "0xd832dc020d7a4a197988487f6cf11a60d77bc059d4ecc46fca407eed9c430920",
+    "prepareFunding": "0xab8af304c6441f4351842d4959911811e03c2d06e82d2a323d4e2979fc670f9c",
+    "fundWorkflow": "0xd377fc8e8d79e04d7111210fcf512f6dd4c0314d544e898021ba738f7cbfe2bf",
+    "startWorkflow": "0xd38bac496b2e1f891393a7291f867b555e16859a857330a5044759044fd3cbfe",
+    "submitResearch": "0xe04ec66d8f0300922befe1e616147f6692889fedc182ad0bf7b8938eb6e1c09c",
+    "submitWriter": "0xc98ad52054be1193e90628159d0944007c3b7a9f7a46f035fc0a2113da538f04",
+    "submitPublisher": "0x2f3c73067a2c8c48651b7586e0860b44aa910e7f5082f3baee10e8d35a22b69b",
+    "openDispute": "0xe2b9008a4b07c47f3a827cda849a644eecb3e6ce64fc38094c7f513d072bd0e3",
+    "adjudicate": "0xd3fecdeafbb30c7382a32dced6f8eab2438aa90e4eba25565cc24047def4f512"
+  },
+  "adjudication": {
+    "transactionHash": "0xd3fecdeafbb30c7382a32dced6f8eab2438aa90e4eba25565cc24047def4f512",
+    "method": "adjudicate",
+    "status": "FINALIZED",
+    "result": 6,
+    "resultName": "MAJORITY_AGREE",
+    "votes": {
+      "agree": 3,
+      "disagree": 2
+    }
+  },
+  "settlementTransfers": [
+    {
+      "allocation": "researchPayout",
+      "transactionHash": "0xa7dc45c69507f18dbec622493ca81b57b6831d71d09934c223bef4b8489db671",
+      "from": "0x9236A835741DF7f891613B5578753647C140124E",
+      "origin": "0x9236A835741DF7f891613B5578753647C140124E",
+      "to": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "value": "1000000000000000000",
+      "status": "FINALIZED",
+      "valueCredited": true,
+      "triggeredBy": "0xd3fecdeafbb30c7382a32dced6f8eab2438aa90e4eba25565cc24047def4f512"
+    },
+    {
+      "allocation": "publisherPayout",
+      "transactionHash": "0xc0c607bcccff569ac847a95817477956b513fd3d1456357d606ce28f0dc8bbb1",
+      "from": "0x9236A835741DF7f891613B5578753647C140124E",
+      "origin": "0x9236A835741DF7f891613B5578753647C140124E",
+      "to": "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2",
+      "value": "1000000000000000000",
+      "status": "FINALIZED",
+      "valueCredited": true,
+      "triggeredBy": "0xd3fecdeafbb30c7382a32dced6f8eab2438aa90e4eba25565cc24047def4f512"
+    },
+    {
+      "allocation": "writerRefund",
+      "transactionHash": "0x689368c746f8afe06c637a7e47cd64fe0c0d026392f038bde5711c81a9f4949a",
+      "from": "0x9236A835741DF7f891613B5578753647C140124E",
+      "origin": "0x9236A835741DF7f891613B5578753647C140124E",
+      "to": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "value": "1000000000000000000",
+      "status": "FINALIZED",
+      "valueCredited": true,
+      "triggeredBy": "0xd3fecdeafbb30c7382a32dced6f8eab2438aa90e4eba25565cc24047def4f512"
+    }
+  ],
+  "conservation": {
+    "deposited": "3000000000000000000",
+    "finalizedSettlementTransfers": "3000000000000000000",
+    "contractBalance": "0",
+    "unaccounted": "0"
+  },
+  "previewVerification": {
+    "branch": "fix/studionet-execution-readback",
+    "commit": "99b930088ae912cb2a63a729180c189403dc5e75",
+    "deploymentId": "dpl_6CKv4CcKgeQDkAq6pp9fTwuTXnE1",
+    "deploymentUrl": "https://firstfault-5sgpk32vn-tdh-s-projects.vercel.app",
+    "branchUrl": "https://firstfault-git-fix-studionet-execution-readback-tdh-s-projects.vercel.app",
+    "verifiedAt": "2026-09-10T13:28:59.289Z",
+    "statusLabel": "Transfers finalized",
+    "parentTransactionHash": "0xd3fecdeafbb30c7382a32dced6f8eab2438aa90e4eba25565cc24047def4f512",
+    "childTransactionHashes": [
+      "0xa7dc45c69507f18dbec622493ca81b57b6831d71d09934c223bef4b8489db671",
+      "0xc0c607bcccff569ac847a95817477956b513fd3d1456357d606ce28f0dc8bbb1",
+      "0x689368c746f8afe06c637a7e47cd64fe0c0d026392f038bde5711c81a9f4949a"
+    ]
+  }
+}

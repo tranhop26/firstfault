@@ -3,6 +3,8 @@ import { localnet, studionet } from "genlayer-js/chains";
 import {
   CalldataAddress,
   ExecutionResult,
+  TransactionResult,
+  TransactionResultNameToNumber,
   TransactionStatus,
   type GenLayerTransaction,
   type TransactionHash,
@@ -158,7 +160,13 @@ function executionSucceeded(receipt: GenLayerTransaction): boolean {
   if (receipt.txExecutionResultName) {
     return receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN;
   }
-  return receipt.consensus_data?.leader_receipt?.[0]?.execution_result === "SUCCESS";
+  const leaderExecution = receipt.consensus_data?.leader_receipt?.[0]?.execution_result;
+  if (leaderExecution) return leaderExecution === "SUCCESS";
+  return receipt.statusName === TransactionStatus.FINALIZED
+    && (
+      receipt.resultName === TransactionResult.MAJORITY_AGREE
+      || receipt.result === Number(TransactionResultNameToNumber.MAJORITY_AGREE)
+    );
 }
 
 /** Headless FirstFault contract boundary shared by browser code and Localnet tests. */
