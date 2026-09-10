@@ -19,6 +19,54 @@ const contractAddress = "0x0000000000000000000000000000000000000001" as Address;
 const parent = { hash: `0x${"1".repeat(64)}` as TransactionHash } as GenLayerTransaction;
 const childHash = `0x${"2".repeat(64)}` as TransactionHash;
 
+function mockSinglePayoutWorkflow(workflowId: string, researcher: string) {
+  client.readContract.mockResolvedValueOnce(JSON.stringify({
+    workflow_id: workflowId,
+    buyer: "0x0000000000000000000000000000000000000003",
+    state: "DECISION_PENDING_FINALITY",
+    outcome: "FIRST_BREACH",
+    deposited: "11",
+    reserved: "0",
+    payout_scheduled: "11",
+    refund_scheduled: "0",
+    paid: "0",
+    refunded: "0",
+    verdict: {
+      outcome: "FIRST_BREACH",
+      first_breach_step: 1,
+      step_statuses: [
+        { step_index: 0, status: "COMPLIANT" },
+        { step_index: 1, status: "MATERIAL_BREACH" },
+        { step_index: 2, status: "COMPLIANT" },
+      ],
+    },
+  })).mockResolvedValueOnce(JSON.stringify({
+    workflow_id: workflowId,
+    step_index: 0,
+    worker: researcher,
+    amount: "11",
+    deadline: "1",
+    state: "PAYOUT_SCHEDULED",
+    brief: "research",
+  })).mockResolvedValueOnce(JSON.stringify({
+    workflow_id: workflowId,
+    step_index: 1,
+    worker: "0x0000000000000000000000000000000000000004",
+    amount: "0",
+    deadline: "2",
+    state: "REFUND_SCHEDULED",
+    brief: "write",
+  })).mockResolvedValueOnce(JSON.stringify({
+    workflow_id: workflowId,
+    step_index: 2,
+    worker: "0x0000000000000000000000000000000000000005",
+    amount: "0",
+    deadline: "3",
+    state: "PAYOUT_SCHEDULED",
+    brief: "publish",
+  }));
+}
+
 describe("FirstFault triggered transfer finality", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -124,6 +172,69 @@ describe("FirstFault triggered transfer finality", () => {
     expect(proof?.parent.hash).toBe(parent.hash);
     expect(proof?.children).toHaveLength(1);
     expect(client.request).toHaveBeenCalledWith({ method: "sim_getTransactionsForAddress", params: [contractAddress] });
+  });
+
+  it.each([
+    ["numeric", { result: 6 }],
+    ["named", { resultName: "MAJORITY_AGREE" }],
+  ])("reconstructs settlement proof from a current Studionet %s majority receipt", async (_case, receiptFields) => {
+    const workflowId = "live-dispute-42";
+    const researcher = "0x0000000000000000000000000000000000000002";
+    const finalizedParent = {
+      ...parent,
+      statusName: "FINALIZED",
+      ...receiptFields,
+      consensus_data: {
+        validators: [
+          { vote: "AGREE", execution_result: "SUCCESS" },
+          { vote: "AGREE", execution_result: "SUCCESS" },
+          { vote: "AGREE", execution_result: "SUCCESS" },
+        ],
+      },
+      data: { calldata: { readable: JSON.stringify({ args: [workflowId], method: "adjudicate" }) } },
+    } as unknown as GenLayerTransaction;
+    client.request.mockResolvedValue([{ hash: parent.hash, to_address: contractAddress, type: 2, status: "FINALIZED" }]);
+    client.getTransaction.mockResolvedValueOnce(finalizedParent).mockResolvedValueOnce({
+      hash: childHash,
+      statusName: "FINALIZED",
+      type: 0,
+      consensus_data: null,
+      triggered_by: parent.hash,
+      from_address: contractAddress,
+      origin_address: contractAddress,
+      to_address: researcher,
+      value: 11n,
+    });
+    mockSinglePayoutWorkflow(workflowId, researcher);
+
+    const adapter = new FirstFault(contractAddress);
+    const proof = await adapter.findSettlementEvidence(workflowId);
+
+    expect(proof?.parent.hash).toBe(parent.hash);
+    expect(proof?.children).toHaveLength(1);
+  });
+
+  it.each([
+    ["is not finalized", { statusName: "ACCEPTED", result: 6 }],
+    ["has no majority", { statusName: "FINALIZED", result: 5 }],
+    ["has majority disagreement", { statusName: "FINALIZED", result: 7 }],
+    ["has an unknown result", { statusName: "FINALIZED", result: 99 }],
+  ])("rejects a current Studionet parent that %s", async (_case, receiptFields) => {
+    const workflowId = "rejected-live-dispute-42";
+    const researcher = "0x0000000000000000000000000000000000000002";
+    client.request.mockResolvedValue([{ hash: parent.hash, to_address: contractAddress, type: 2, status: "FINALIZED" }]);
+    client.getTransaction.mockResolvedValue({
+      ...parent,
+      ...receiptFields,
+      consensus_data: { validators: [{ vote: "AGREE", execution_result: "SUCCESS" }] },
+      data: { calldata: { readable: JSON.stringify({ args: [workflowId], method: "adjudicate" }) } },
+    } as unknown as GenLayerTransaction);
+    mockSinglePayoutWorkflow(workflowId, researcher);
+
+    const adapter = new FirstFault(contractAddress);
+
+    await expect(adapter.findSettlementEvidence(workflowId)).resolves.toBeNull();
+    expect(client.getTriggeredTransactionIds).not.toHaveBeenCalled();
   });
 
   it("uses the approved mutual allocation when reconstructing settlement proof", async () => {
