@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { isAddress, type Address } from "viem";
 import type { CreateWorkflowInput } from "@/lib/contracts/FirstFault";
 import type { ProjectedStatus } from "@/lib/firstfault/status";
@@ -19,6 +19,14 @@ export function WorkflowComposer({ disabled, onCreate, status, parentHash, child
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ id: "", orchestrator: "", researcher: "", writer: "", publisher: "", research: "", writing: "", publishing: "", researchAmount: "10", writerAmount: "10", publisherAmount: "10", researchHours: "1", writerHours: "2", publisherHours: "3" });
   const [formError, setFormError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
   const set = (name: keyof typeof form, value: string) => setForm((current) => ({ ...current, [name]: value }));
   const create = async () => {
     const now = Math.floor(Date.now() / 1000);

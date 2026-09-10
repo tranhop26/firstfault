@@ -12,7 +12,10 @@ import { EvidencePanel } from "./EvidencePanel";
 import { FundingPanel } from "./FundingPanel";
 import { CaseSubnav } from "./CaseSubnav";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  document.body.style.overflow = "";
+});
 
 const steps = [0, 1, 2].map((stepIndex) => ({
   workflow_id: "demo-42",
@@ -173,6 +176,17 @@ describe("FirstFault truthful interface", () => {
     const help = screen.getByText(/deadlines are measured/i);
     expect(help.classList.contains("ff-form-help")).toBe(true);
     expect(help.textContent).not.toMatch(/V2/i);
+  });
+
+  it("locks background scrolling only while the workflow dialog is open", () => {
+    document.body.style.overflow = "auto";
+    render(<WorkflowComposer disabled={false} onCreate={() => Promise.resolve()} status={{ phase: "READY", label: "Ready", detail: "Ready" }} parentHash={null} childHashes={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /create workflow/i }));
+    expect(document.body.style.overflow).toBe("hidden");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(document.body.style.overflow).toBe("auto");
   });
 
   it("blocks an incomplete create form before any contract write", () => {
