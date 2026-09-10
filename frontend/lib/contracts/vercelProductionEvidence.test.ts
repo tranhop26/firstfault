@@ -3,13 +3,13 @@ import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 
 describe("V3 Vercel Production evidence", () => {
-  test("binds production to V3 while preserving the verified V1 rollback point", async () => {
+  test("binds production to the receipt fix while preserving verified rollback evidence", async () => {
     const path = resolve(process.cwd(), "../deployments/vercel.json");
     const evidence = JSON.parse(await readFile(path, "utf8"));
 
     expect(evidence).toMatchObject({
-      deploymentCommit: "ab67a2b7e5d4da1b315179c0ea5dd4523bea5f2f",
-      deploymentId: "6S85eiff8Dwk634YTZbmzNk5pxaR",
+      deploymentCommit: "68d9b89a708daf7ae547a9b998f58e981d3a0b3a",
+      deploymentId: "Gkfi7PGacCy18n6PeeY1WV97nfRu",
       url: "https://firstfault.vercel.app",
       environment: {
         NEXT_PUBLIC_GENLAYER_RPC_URL: "https://studio.genlayer.com/api",
@@ -27,6 +27,27 @@ describe("V3 Vercel Production evidence", () => {
           payoutScheduled: "3000000000000000000",
           transferProof: "Transfers finalized",
           finalizedTransferCount: 3,
+          readWithoutWallet: true,
+        },
+        v3DisputeReadback: {
+          workflowId: "firstfault-v3-writer-breach-20260910-1",
+          state: "DECISION_PENDING_FINALITY",
+          outcome: "FIRST_BREACH",
+          firstBreachStep: 1,
+          stepStatuses: ["COMPLIANT", "MATERIAL_BREACH", "COMPLIANT"],
+          deposited: "3000000000000000000",
+          reserved: "0",
+          payoutScheduled: "2000000000000000000",
+          refundScheduled: "1000000000000000000",
+          transferProof: "Transfers finalized",
+          parentTransactionHash: "0xd3fecdeafbb30c7382a32dced6f8eab2438aa90e4eba25565cc24047def4f512",
+          childTransactionHashes: [
+            "0xa7dc45c69507f18dbec622493ca81b57b6831d71d09934c223bef4b8489db671",
+            "0xc0c607bcccff569ac847a95817477956b513fd3d1456357d606ce28f0dc8bbb1",
+            "0x689368c746f8afe06c637a7e47cd64fe0c0d026392f038bde5711c81a9f4949a",
+          ],
+          finalizedTransferCount: 3,
+          transferValueEach: "1000000000000000000",
           readWithoutWallet: true,
         },
       },
