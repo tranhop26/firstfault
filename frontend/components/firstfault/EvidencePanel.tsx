@@ -3,7 +3,7 @@ import type { FirstFaultStep } from "@/lib/contracts/FirstFault";
 export function EvidencePanel({ steps }: { steps: FirstFaultStep[] }) {
   const evidence = steps.filter((step) => step.evidence_hash);
   return (
-    <section className="ff-panel">
+    <section className="ff-panel" id="evidence">
       <div className="ff-section-head"><div><span className="ff-eyebrow">Evidence ledger</span><h2>Bound artifacts</h2></div><span>{evidence.length}/3 supplied</span></div>
       {evidence.length === 0 ? <div className="ff-empty"><span>◇</span><strong>No evidence submitted yet</strong><p>Evidence appears only after contract readback confirms its hash.</p></div> : (
         <div className="ff-evidence-list">{evidence.map((step) => (

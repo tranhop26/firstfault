@@ -21,7 +21,7 @@ export function WorkflowTimeline({ steps, workflowState, activeAddress, canAct, 
 }) {
   const [drafts, setDrafts] = useState<Record<number, { output: string; source: string }>>({});
   return (
-    <section className="ff-panel ff-timeline-panel">
+    <section className="ff-panel ff-timeline-panel" id="workflow-desk">
       <div className="ff-section-head">
         <div><span className="ff-eyebrow">Authoritative workflow</span><h2>Three bound delivery steps</h2></div>
         <span className="ff-trust-chip">Contract source of truth</span>

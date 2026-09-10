@@ -9,6 +9,7 @@ import { VerdictPanel } from "@/components/firstfault/VerdictPanel";
 import { TransactionStatus } from "@/components/firstfault/TransactionStatus";
 import { FundingPanel } from "@/components/firstfault/FundingPanel";
 import { RecoveryPanel } from "@/components/firstfault/RecoveryPanel";
+import { CaseSubnav } from "@/components/firstfault/CaseSubnav";
 import { canWrite } from "@/lib/firstfault/status";
 import { formatGen } from "@/lib/firstfault/amounts";
 import { isDisputeTimeoutReady } from "@/lib/firstfault/recovery";
@@ -57,7 +58,7 @@ export default function HomePage() {
             {app.wallet.isConnected ? <><span title={app.wallet.address ?? ""}>{short(app.wallet.address ?? "")}</span><button onClick={app.wallet.disconnectWallet}>Disconnect</button></> : <button className="ff-connect" onClick={() => app.wallet.connectWallet()}>Connect wallet</button>}
           </div>
         </div></div>
-        <div className="ff-subnav"><div className="ff-shell"><span>Workflow desk</span><span>Evidence</span><span>Disputes</span><span>Recovery</span><span className="ff-frozen">{app.contractVersion === "v2" ? "V2 recovery contract" : "Intentionally frozen contract"}</span></div></div>
+        <CaseSubnav contractVersion={app.contractVersion} hasWorkflow={Boolean(app.workflow)} recoveryAvailable={app.workflow?.state === "UNRESOLVED"} />
       </header>
 
       <main>

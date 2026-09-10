@@ -10,6 +10,7 @@ import { VerdictPanel } from "./VerdictPanel";
 import { RecoveryPanel } from "./RecoveryPanel";
 import { EvidencePanel } from "./EvidencePanel";
 import { FundingPanel } from "./FundingPanel";
+import { CaseSubnav } from "./CaseSubnav";
 
 afterEach(cleanup);
 
@@ -42,6 +43,20 @@ function fillValidWorkflowForm(workflowId = "workflow-42") {
 }
 
 describe("FirstFault truthful interface", () => {
+  it("links the case navigation to real sections and marks unavailable recovery", () => {
+    const { rerender } = render(<CaseSubnav contractVersion="v3" hasWorkflow recoveryAvailable={false} />);
+
+    expect(screen.getByRole("link", { name: "Workflow desk" }).getAttribute("href")).toBe("#workflow-desk");
+    expect(screen.getByRole("link", { name: "Evidence" }).getAttribute("href")).toBe("#evidence");
+    expect(screen.getByRole("link", { name: "Disputes" }).getAttribute("href")).toBe("#disputes");
+    expect(screen.queryByRole("link", { name: "Recovery" })).toBeNull();
+    expect(screen.getByText("Recovery").getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByRole("status").textContent).toMatch(/intentionally frozen/i);
+
+    rerender(<CaseSubnav contractVersion="v3" hasWorkflow recoveryAvailable />);
+    expect(screen.getByRole("link", { name: "Recovery" }).getAttribute("href")).toBe("#recovery");
+  });
+
   it("identifies the project as a GenLayer Agent Tank 2026 entry", () => {
     render(<><AgentTankBadge /><AgentTankEntryLabel /></>);
     expect(screen.getByText("Built for GenLayer")).toBeTruthy();
@@ -155,6 +170,9 @@ describe("FirstFault truthful interface", () => {
     expect(screen.getByLabelText("Research deadline hours")).toBeTruthy();
     expect(screen.getByLabelText("Writer deadline hours")).toBeTruthy();
     expect(screen.getByLabelText("Publisher deadline hours")).toBeTruthy();
+    const help = screen.getByText(/deadlines are measured/i);
+    expect(help.classList.contains("ff-form-help")).toBe(true);
+    expect(help.textContent).not.toMatch(/V2/i);
   });
 
   it("blocks an incomplete create form before any contract write", () => {
