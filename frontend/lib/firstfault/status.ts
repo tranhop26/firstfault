@@ -72,7 +72,7 @@ export function projectTransactionStatus(input: TransactionProjectionInput): Pro
   }
 
   if (!input.connected) return { phase: "DISCONNECTED", label: "Wallet not connected", detail: "Connect a wallet to submit a contract action." };
-  if (!input.correctNetwork) return { phase: "WRONG_NETWORK", label: "Wrong network", detail: "Switch to GenLayer Studionet before continuing." };
+  if (!input.correctNetwork) return { phase: "WRONG_NETWORK", label: "Wrong network", detail: "Switch to GenLayer Studio Next before continuing." };
 
   if (input.readback?.state === "UNRESOLVED") {
     return { phase: "UNRESOLVED", label: "Unresolved — funds held", detail: `${formatGen(input.readback.reserved)} simulated GEN remains reserved by the contract.` };
@@ -92,5 +92,5 @@ export function projectTransactionStatus(input: TransactionProjectionInput): Pro
   if (input.submitted || input.receipt) {
     return { phase: "SUBMITTED", label: "Submitted", detail: "The transaction is awaiting consensus and finality." };
   }
-  return { phase: "READY", label: "Ready", detail: "Contract state is loaded from Studionet." };
+  return { phase: "READY", label: "Ready", detail: "Contract state is loaded from Studio Next." };
 }

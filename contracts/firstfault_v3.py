@@ -1,11 +1,13 @@
-# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
+# { "Depends": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng" }
 
 """Frozen FirstFault V3 lifecycle with Studio-safe actor inputs and safe custody."""
 
 import json
 from dataclasses import dataclass
 
-from genlayer import *
+import genlayer as gl
+from genlayer.types import *
+from genlayer.storage import allow as allow_storage
 
 
 @allow_storage
@@ -134,17 +136,17 @@ class _Recipient:
         pass
 
 
-class FirstFault(gl.Contract):
+class FirstFault(gl.contract.Contract):
     """The intentionally frozen source of truth for workflow lifecycle state."""
 
-    workflows: TreeMap[str, Workflow]
-    steps: TreeMap[str, Step]
-    cures: TreeMap[str, Cure]
-    settlements: TreeMap[str, Settlement]
-    settlement_approvals: TreeMap[str, str]
-    used_nonces: TreeMap[str, u8]
-    funding_intents: TreeMap[str, FundingIntent]
-    funding_outcomes: TreeMap[str, FundingOutcome]
+    workflows: gl.storage.TreeMap[str, Workflow]
+    steps: gl.storage.TreeMap[str, Step]
+    cures: gl.storage.TreeMap[str, Cure]
+    settlements: gl.storage.TreeMap[str, Settlement]
+    settlement_approvals: gl.storage.TreeMap[str, str]
+    used_nonces: gl.storage.TreeMap[str, u8]
+    funding_intents: gl.storage.TreeMap[str, FundingIntent]
+    funding_outcomes: gl.storage.TreeMap[str, FundingOutcome]
     funding_attempt_count: u256
     total_accepted_funding: bigint
     total_rejected_funding_received: bigint
@@ -240,7 +242,7 @@ class FirstFault(gl.Contract):
         """Return whole UTC seconds from the pinned runtime's transaction message."""
         from datetime import datetime
 
-        runtime_datetime = gl.message_raw.get("datetime", "")
+        runtime_datetime = gl.message.raw.get("datetime", "")
         if not isinstance(runtime_datetime, str) or runtime_datetime == "":
             raise gl.vm.UserError("Runtime timestamp unavailable")
         try:
@@ -249,7 +251,7 @@ class FirstFault(gl.Contract):
             raise gl.vm.UserError("Invalid runtime timestamp")
         if parsed.tzinfo is None:
             raise gl.vm.UserError("Invalid runtime timestamp")
-        return u256(int(parsed.timestamp()))
+        return int(parsed.timestamp())
 
     def _canonical_research_source(self, source_url: str) -> str:
         """Accept only a stable, credential-free absolute HTTPS source URL."""
@@ -434,7 +436,7 @@ class FirstFault(gl.Contract):
                     item["status"] == "UNRESOLVED"
                     and actor == self._step(workflow_id, step_index).worker
                 ):
-                    return u8(step_index)
+                    return int(step_index)
         except (TypeError, ValueError, KeyError):
             pass
         raise gl.vm.UserError("Affected worker only")
@@ -717,7 +719,7 @@ class FirstFault(gl.Contract):
         self.steps[workflow_id + ":" + str(step_index)] = step
         if step_index == 2:
             workflow.state = "READY_FOR_REVIEW"
-            workflow.review_deadline = u256(submitted_at + self.REVIEW_WINDOW_SECONDS)
+            workflow.review_deadline = int(submitted_at + self.REVIEW_WINDOW_SECONDS)
             self.workflows[workflow_id] = workflow
 
     @gl.public.write
@@ -737,7 +739,7 @@ class FirstFault(gl.Contract):
         self._consume_nonce(nonce)
         workflow.rejection_reason = "Worker deadline expired before completion"
         workflow.dispute_opened_at = now
-        workflow.adjudication_round = u256(workflow.adjudication_round + 1)
+        workflow.adjudication_round = int(workflow.adjudication_round + 1)
         workflow.round_opened_at = now
         workflow.outcome = ""
         workflow.verdict_json = ""
@@ -756,7 +758,7 @@ class FirstFault(gl.Contract):
         self._consume_nonce(nonce)
         workflow.rejection_reason = "Buyer review window expired without a decision"
         workflow.dispute_opened_at = now
-        workflow.adjudication_round = u256(workflow.adjudication_round + 1)
+        workflow.adjudication_round = int(workflow.adjudication_round + 1)
         workflow.round_opened_at = now
         workflow.outcome = ""
         workflow.verdict_json = ""
@@ -780,7 +782,7 @@ class FirstFault(gl.Contract):
         self._consume_nonce(nonce)
         workflow.state = "DISPUTED"
         workflow.dispute_opened_at = now
-        workflow.adjudication_round = u256(workflow.adjudication_round + 1)
+        workflow.adjudication_round = int(workflow.adjudication_round + 1)
         workflow.round_opened_at = now
         workflow.outcome = ""
         workflow.verdict_json = ""
@@ -810,7 +812,7 @@ class FirstFault(gl.Contract):
             step.state = "REFUND_SCHEDULED" if refund_amount > 0 else "CANCELED"
             self.steps[workflow_id + ":" + str(step_index)] = step
         if refund_amount > 0:
-            _Recipient(workflow.buyer).emit_transfer(value=u256(refund_amount))
+            _Recipient(workflow.buyer).emit_transfer(value=int(refund_amount))
 
     @gl.public.write
     def prepare_funding(
@@ -825,12 +827,12 @@ class FirstFault(gl.Contract):
         now = self._submission_timestamp()
         if expires_at <= now or expires_at > now + self.MAX_FUNDING_INTENT_LIFETIME_SECONDS:
             raise gl.vm.UserError("Invalid funding intent expiry")
-        version = u256(1)
+        version = int(1)
         if workflow_id in self.funding_intents:
             current = self.funding_intents[workflow_id]
             if current.consumed == 0 and current.expires_at >= now:
                 raise gl.vm.UserError("Active funding intent exists")
-            version = u256(current.version + 1)
+            version = int(current.version + 1)
         self._consume_nonce(nonce)
         expected_amount = (
             self._step(workflow_id, 0).amount
@@ -857,7 +859,7 @@ class FirstFault(gl.Contract):
             expected_amount=expected_amount,
             expires_at=expires_at,
             version=version,
-            chain_id=u256(gl.message.chain_id),
+            chain_id=int(gl.message.chain_id),
             contract_address=gl.message.contract_address,
             nonce=nonce,
             intent_hash=self._sha256_hex(domain),
@@ -908,7 +910,7 @@ class FirstFault(gl.Contract):
         workflow_state: str,
         attempted_at: u256,
     ) -> u256:
-        received = bigint(gl.message.value)
+        received = int(gl.message.value)
         self.total_rejected_funding_received += received
         self.total_rejected_funding_refund_scheduled += received
         result = "REFUND_SCHEDULED" if received > 0 else "REJECTED_NO_VALUE"
@@ -918,7 +920,7 @@ class FirstFault(gl.Contract):
             intent_id,
             intent_version,
             received,
-            bigint(0),
+            int(0),
             received,
             reason,
             result,
@@ -926,7 +928,7 @@ class FirstFault(gl.Contract):
             attempted_at,
         )
         if received > 0:
-            _Recipient(gl.message.sender_address).emit_transfer(value=u256(received))
+            _Recipient(gl.message.sender_address).emit_transfer(value=int(received))
         return attempt_index
 
     @gl.public.write.payable
@@ -939,10 +941,10 @@ class FirstFault(gl.Contract):
         bounded_intent_id = self._bounded_funding_identifier(intent_id)
         if bounded_workflow_id != workflow_id or bounded_intent_id != intent_id:
             return self._reject_funding(
-                attempt_index, bounded_workflow_id, bounded_intent_id, u256(0),
+                attempt_index, bounded_workflow_id, bounded_intent_id, int(0),
                 "INVALID_IDENTIFIER", "UNKNOWN", now,
             )
-        intent_version = u256(0)
+        intent_version = int(0)
         if workflow_id in self.funding_intents:
             intent_version = self.funding_intents[workflow_id].version
         if workflow_id not in self.workflows:
@@ -1008,9 +1010,9 @@ class FirstFault(gl.Contract):
             workflow_id,
             intent_id,
             intent.version,
-            bigint(gl.message.value),
-            bigint(gl.message.value),
-            bigint(0),
+            int(gl.message.value),
+            int(gl.message.value),
+            int(0),
             "",
             "FUNDED",
             workflow.state,
@@ -1053,7 +1055,7 @@ class FirstFault(gl.Contract):
             )
             self.steps[workflow_id + ":" + str(step_index)] = step
             if step.amount > 0:
-                _Recipient(step.worker).emit_transfer(value=u256(step.amount))
+                _Recipient(step.worker).emit_transfer(value=int(step.amount))
 
     @gl.public.write
     def open_dispute(self, workflow_id: str, rejection_reason: str, nonce: str) -> None:
@@ -1069,7 +1071,7 @@ class FirstFault(gl.Contract):
         self._consume_nonce(nonce)
         workflow.rejection_reason = rejection_reason.strip()
         workflow.dispute_opened_at = dispute_opened_at
-        workflow.adjudication_round = u256(workflow.adjudication_round + 1)
+        workflow.adjudication_round = int(workflow.adjudication_round + 1)
         workflow.round_opened_at = dispute_opened_at
         workflow.state = "DISPUTED"
         self.workflows[workflow_id] = workflow
@@ -1100,7 +1102,7 @@ class FirstFault(gl.Contract):
                 or now - step.observed_at <= self.MAX_OBSERVATION_AGE_SECONDS
             ):
                 raise gl.vm.UserError("Evidence remains fresh")
-            cure_key = self._cure_key(workflow_id, u8(step_index))
+            cure_key = self._cure_key(workflow_id, int(step_index))
             if cure_key in self.cures:
                 cure = self.cures[cure_key]
                 if (
@@ -1214,7 +1216,7 @@ class FirstFault(gl.Contract):
                     del self.settlement_approvals[approval_key]
         workflow.state = "DISPUTED"
         workflow.dispute_opened_at = submitted_at
-        workflow.adjudication_round = u256(workflow.adjudication_round + 1)
+        workflow.adjudication_round = int(workflow.adjudication_round + 1)
         workflow.round_opened_at = submitted_at
         workflow.outcome = ""
         workflow.verdict_json = ""
@@ -1239,13 +1241,13 @@ class FirstFault(gl.Contract):
             current = self.settlements[workflow_id]
             if self._settlement_fully_approved(workflow_id, current):
                 raise gl.vm.UserError("Proposal already unanimously approved")
-        research = bigint(research_amount)
-        writer = bigint(writer_amount)
-        publisher = bigint(publisher_amount)
-        refund = bigint(buyer_refund)
+        research = int(research_amount)
+        writer = int(writer_amount)
+        publisher = int(publisher_amount)
+        refund = int(buyer_refund)
         if research + writer + publisher + refund != workflow.reserved:
             raise gl.vm.UserError("Allocation must equal reserved value")
-        version = u256(workflow.settlement_generation + 1)
+        version = int(workflow.settlement_generation + 1)
         proposal_hash = self._settlement_hash(
             workflow_id,
             version,
@@ -1361,11 +1363,11 @@ class FirstFault(gl.Contract):
             self.steps[workflow_id + ":" + str(step_index)] = step
             if worker_amounts[step_index] > 0:
                 _Recipient(step.worker).emit_transfer(
-                    value=u256(worker_amounts[step_index])
+                    value=int(worker_amounts[step_index])
                 )
         if settlement.buyer_refund > 0:
             _Recipient(workflow.buyer).emit_transfer(
-                value=u256(settlement.buyer_refund)
+                value=int(settlement.buyer_refund)
             )
 
     @gl.public.write
@@ -1438,7 +1440,7 @@ class FirstFault(gl.Contract):
         cures = []
         cures_are_valid = True
         for step_index in range(3):
-            cure_key = self._cure_key(workflow_id, u8(step_index))
+            cure_key = self._cure_key(workflow_id, int(step_index))
             if cure_key not in self.cures:
                 continue
             cure = self.cures[cure_key]
@@ -1534,8 +1536,8 @@ class FirstFault(gl.Contract):
             self.workflows[workflow_id] = workflow
             return
 
-        payout_amount = bigint(0)
-        refund_amount = bigint(0)
+        payout_amount = int(0)
+        refund_amount = int(0)
         scheduled = []
         for step_index in range(3):
             step = self._step(workflow_id, step_index)
@@ -1560,7 +1562,7 @@ class FirstFault(gl.Contract):
         workflow.state = "DECISION_PENDING_FINALITY"
         self.workflows[workflow_id] = workflow
         for transfer in scheduled:
-            _Recipient(transfer["recipient"]).emit_transfer(value=u256(transfer["amount"]))
+            _Recipient(transfer["recipient"]).emit_transfer(value=int(transfer["amount"]))
 
     def _incomplete_delivery_verdict(self, first_missing_step: int, evidence_hashes: list) -> dict:
         statuses = []
@@ -1945,7 +1947,7 @@ class FirstFault(gl.Contract):
         result = {"workflow_id": workflow_id}
         cures = []
         for step_index in range(3):
-            cure_key = self._cure_key(workflow_id, u8(step_index))
+            cure_key = self._cure_key(workflow_id, int(step_index))
             if cure_key not in self.cures:
                 continue
             cure = self.cures[cure_key]

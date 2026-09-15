@@ -10,8 +10,12 @@ from gltest.direct.loader import deploy_contract
 
 def _inject_message_with_pipe(vm):
     """Supply direct-mode message data without Windows' locked temp files."""
-    from genlayer.py import calldata
-    from genlayer.py.types import Address
+    try:
+        from genlayer import calldata
+        from genlayer.types import Address
+    except ImportError:  # v0.2 runner compatibility for historical contracts
+        from genlayer.py import calldata
+        from genlayer.py.types import Address
 
     sender = Address(vm.sender) if isinstance(vm.sender, bytes) else vm.sender
     contract_address = vm._contract_address
@@ -74,14 +78,20 @@ def to_hex(addr_bytes):
     """
     if hasattr(addr_bytes, "as_hex"):
         return addr_bytes.as_hex
-    from genlayer.py.types import Address
+    try:
+        from genlayer.types import Address
+    except ImportError:  # v0.2 runner compatibility for historical contracts
+        from genlayer.py.types import Address
 
     return Address(addr_bytes).as_hex
 
 
 def to_address(addr_bytes):
     """Convert a direct-runner address to the contract SDK Address type."""
-    from genlayer.py.types import Address
+    try:
+        from genlayer.types import Address
+    except ImportError:  # v0.2 runner compatibility for historical contracts
+        from genlayer.py.types import Address
 
     if hasattr(addr_bytes, "as_hex"):
         return addr_bytes

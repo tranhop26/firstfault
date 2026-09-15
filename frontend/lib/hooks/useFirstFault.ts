@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExecutionResult, TransactionStatus, type GenLayerTransaction, type TransactionHash } from "genlayer-js/types";
 import { isAddress, type Address } from "viem";
@@ -9,17 +9,20 @@ import FirstFault, {
   type CreateWorkflowInput,
   type FirstFaultFundingIntent,
   type FirstFaultFundingOutcome,
+  type FirstFaultFeeQuote,
 } from "@/lib/contracts/FirstFault";
 import type { FundingPhase } from "@/components/firstfault/FundingPanel";
-import { getContractAddress, getContractVersion } from "@/lib/genlayer/client";
+import { GENLAYER_CHAIN_ID, getContractAddress, getContractVersion } from "@/lib/genlayer/client";
 import { useWallet } from "@/lib/genlayer/WalletProvider";
 import { projectTransactionStatus, type TransactionEvidence } from "@/lib/firstfault/status";
 import {
   clearReconciliationHash,
   getReconciliationStorage,
+  reconciliationKey as makeReconciliationKey,
   readReconciliationHash,
   writeReconciliationHash,
 } from "@/lib/firstfault/reconciliationStorage";
+import { runExclusiveWrite } from "@/lib/firstfault/writeGate";
 
 function evidence(receipt: GenLayerTransaction): TransactionEvidence {
   const externalTransferSucceeded = receipt.type === 0 && receipt.statusName === TransactionStatus.FINALIZED;
@@ -44,19 +47,53 @@ export function useFirstFault(workflowId: string) {
   const configuredAddress = getContractAddress();
   const contractVersion = getContractVersion();
   const configured = isAddress(configuredAddress);
-  const reconciliationKey = `firstfault:parent:${configuredAddress.toLowerCase()}:${workflowId.trim()}`;
+  const reconciliationKey = makeReconciliationKey(configuredAddress, workflowId);
+  const [feeApproval, setFeeApproval] = useState<FirstFaultFeeQuote | null>(null);
+  const feeDecision = useRef<{ resolve: () => void; reject: (error: Error) => void } | null>(null);
+  const writeInFlight = useRef(false);
+  const submittedReconciliationKey = useRef<string | null>(null);
+  const confirmFee = useCallback((quote: FirstFaultFeeQuote) => new Promise<void>((resolve, reject) => {
+    if (feeDecision.current) {
+      reject(new Error("Another Studio Next fee approval is already pending"));
+      return;
+    }
+    feeDecision.current = { resolve, reject };
+    setFeeApproval(quote);
+  }), []);
+  const validateBeforeSubmit = useCallback(async () => {
+    const provider = window.ethereum;
+    if (!provider || !wallet.address) throw new Error("Wallet disconnected before signing");
+    const [rawChainId, rawAccounts] = await Promise.all([
+      provider.request({ method: "eth_chainId" }),
+      provider.request({ method: "eth_accounts" }),
+    ]);
+    const chainId = typeof rawChainId === "string" ? Number.parseInt(rawChainId, 16) : Number(rawChainId);
+    const accounts = Array.isArray(rawAccounts) ? rawAccounts : [];
+    const activeAddress = typeof accounts[0] === "string" ? accounts[0] : "";
+    if (chainId !== GENLAYER_CHAIN_ID) throw new Error("Wallet network changed before signing; switch back to Studio Next");
+    if (activeAddress.toLowerCase() !== wallet.address.toLowerCase()) {
+      throw new Error("Wallet account changed before signing; review the fee again");
+    }
+  }, [wallet.address]);
   const contract = useMemo(
     () => configured ? new FirstFault(
       configuredAddress as Address,
       wallet.address as Address | undefined,
       undefined,
-      (hash) => {
+      (hash, action) => {
         const storage = getReconciliationStorage(window);
-        if (storage) writeReconciliationHash(storage, reconciliationKey, hash);
+        const targetWorkflowId = action.functionName === "create_workflow" && typeof action.args[0] === "string"
+          ? action.args[0]
+          : workflowId.trim();
+        const targetKey = makeReconciliationKey(configuredAddress, targetWorkflowId);
+        submittedReconciliationKey.current = targetKey;
+        if (storage) writeReconciliationHash(storage, targetKey, hash);
       },
       contractVersion,
+      confirmFee,
+      validateBeforeSubmit,
     ) : null,
-    [configured, configuredAddress, contractVersion, reconciliationKey, wallet.address],
+    [configured, configuredAddress, contractVersion, confirmFee, reconciliationKey, validateBeforeSubmit, wallet.address],
   );
   const [receipt, setReceipt] = useState<TransactionEvidence | null>(null);
   const [children, setChildren] = useState<TransactionEvidence[]>([]);
@@ -65,6 +102,20 @@ export function useFirstFault(workflowId: string) {
   const [fundingIntent, setFundingIntent] = useState<FirstFaultFundingIntent | null>(null);
   const [fundingOutcome, setFundingOutcome] = useState<FirstFaultFundingOutcome | null>(null);
   const [fundingPhase, setFundingPhase] = useState<FundingPhase>("READY");
+
+  const approveFee = useCallback(() => {
+    const pending = feeDecision.current;
+    feeDecision.current = null;
+    setFeeApproval(null);
+    pending?.resolve();
+  }, []);
+
+  const cancelFee = useCallback(() => {
+    const pending = feeDecision.current;
+    feeDecision.current = null;
+    setFeeApproval(null);
+    pending?.reject(new Error("Transaction cancelled before signing"));
+  }, []);
 
   const enabled = Boolean(contract && workflowId.trim());
   const workflowQuery = useQuery({
@@ -128,11 +179,9 @@ export function useFirstFault(workflowId: string) {
     if (!storedHash) return;
     let active = true;
     setSubmitted(true);
-    Promise.all([
-      contract.getTransactionReceipt(storedHash),
-      contract.getTriggeredReceiptsByHash(storedHash),
-    ])
-      .then(async ([parent, triggered]) => {
+    contract.getTransactionReceipt(storedHash)
+      .then(async (parent) => {
+        const triggered = await contract.getTriggeredReceiptsByHash(storedHash);
         if (!active) return;
         setReceipt(evidence(parent));
         setChildren(triggered.map(evidence));
@@ -175,21 +224,23 @@ export function useFirstFault(workflowId: string) {
     mutationFn: async (action: () => Promise<GenLayerTransaction>) => {
       if (!contract) throw new Error("NEXT_PUBLIC_CONTRACT_ADDRESS is not configured with a valid deployed address.");
       if (!wallet.isConnected) throw new Error("Connect a wallet before submitting a contract action.");
-      if (!wallet.isOnCorrectNetwork) throw new Error("Switch to GenLayer Studionet before submitting.");
-      setSubmitted(true);
-      setActionError(null);
-      setReceipt(null);
-      setChildren([]);
-      const parent = await action();
-      setReceipt(evidence(parent));
-      const parentHash = (parent.hash ?? parent.txId) as TransactionHash | undefined;
-      const storage = getReconciliationStorage(window);
-      if (parentHash && storage) writeReconciliationHash(storage, reconciliationKey, parentHash);
-      const triggered = await contract.getTriggeredReceipts(parent);
-      setChildren(triggered.map(evidence));
-      if (triggered.length === 0 && storage) clearReconciliationHash(storage, reconciliationKey);
-      await refresh();
-      return parent;
+      if (!wallet.isOnCorrectNetwork) throw new Error("Switch to GenLayer Studio Next before submitting.");
+      return runExclusiveWrite(writeInFlight, async () => {
+        setSubmitted(true);
+        setActionError(null);
+        setReceipt(null);
+        setChildren([]);
+        submittedReconciliationKey.current = null;
+        const parent = await action();
+        setReceipt(evidence(parent));
+        const triggered = await contract.getTriggeredReceipts(parent);
+        setChildren(triggered.map(evidence));
+        const storage = getReconciliationStorage(window);
+        const durableKey = submittedReconciliationKey.current;
+        if (triggered.length === 0 && storage && durableKey) clearReconciliationHash(storage, durableKey);
+        await refresh();
+        return parent;
+      });
     },
     onError: (cause) => setActionError(cause instanceof Error ? cause.message : "Unknown contract error"),
     onSettled: () => setSubmitted(false),
@@ -292,6 +343,9 @@ export function useFirstFault(workflowId: string) {
     fundingIntent,
     fundingOutcome,
     fundingPhase,
+    feeApproval,
+    approveFee,
+    cancelFee,
     loading: workflowQuery.isLoading || stepsQuery.isLoading || accountingQuery.isLoading || recoveryQuery.isLoading,
     readError: workflowQuery.error instanceof Error ? workflowQuery.error.message : null,
     actionPending: mutation.isPending,

@@ -2,7 +2,9 @@
   "name": "genlayer-project",
   "type": "module",
   "private": true,
-  "workspaces": ["frontend"],
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
     "dev": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build",
@@ -12,13 +14,15 @@
     "deploy": "tsx deploy/deployScript.ts",
     "deploy:v2": "tsx deploy/deployV2.ts",
     "deploy:v3": "tsx deploy/deployV3.ts",
+    "deploy:studio-next": "tsx deploy/deployStudioNext.ts",
     "lint:deploy": "tsc --noEmit --project tsconfig.json",
     "verify:deployment": "npm --prefix frontend test -- lib/contracts/verifyDeployment.test.ts lib/contracts/deploymentManifest.test.ts lib/contracts/deployFirstFault.test.ts"
   },
   "devDependencies": {
     "@types/node": "24.9.1",
-    "genlayer-js": "^1.1.8",
+    "genlayer-js": "2.0.0-rc.1",
     "tsx": "4.20.6",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "viem": "2.56.3"
   }
 }

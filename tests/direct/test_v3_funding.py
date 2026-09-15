@@ -35,9 +35,14 @@ def deploy_draft(direct_vm, direct_deploy, direct_alice, direct_bob, direct_char
 
 def warp_transaction_time(direct_vm, timestamp):
     direct_vm.warp(timestamp)
-    import genlayer.gl as runtime_gl
+    try:
+        import genlayer.message as runtime_message
 
-    runtime_gl.message_raw["datetime"] = timestamp
+        runtime_message.raw["datetime"] = timestamp
+    except ImportError:  # v0.2 runner compatibility for historical contracts
+        import genlayer.gl as runtime_gl
+
+        runtime_gl.message_raw["datetime"] = timestamp
 
 
 def test_prepared_intent_readback_binds_the_runtime_domain(

@@ -4,6 +4,7 @@ import type { TransactionHash } from "genlayer-js/types";
 import {
   clearReconciliationHash,
   getReconciliationStorage,
+  reconciliationKey,
   readReconciliationHash,
   writeReconciliationHash,
 } from "./reconciliationStorage";
@@ -12,6 +13,9 @@ const key = "firstfault:parent:contract:workflow";
 const hash = `0x${"a".repeat(64)}` as TransactionHash;
 
 describe("best-effort reconciliation storage", () => {
+  it("keys a create transaction by its submitted workflow ID", () => {
+    expect(reconciliationKey("0xABC", "  case-42 ")).toBe("firstfault:parent:0xabc:case-42");
+  });
   it("handles a browser that throws while exposing the localStorage property", () => {
     const browser = Object.defineProperty({}, "localStorage", {
       get: () => { throw new DOMException("blocked", "SecurityError"); },

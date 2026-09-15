@@ -1,5 +1,5 @@
 import { createClient } from "genlayer-js";
-import { localnet, studionet } from "genlayer-js/chains";
+import { localnet } from "genlayer-js/chains";
 import {
   CalldataAddress,
   ExecutionResult,
@@ -7,9 +7,12 @@ import {
   TransactionResultNameToNumber,
   TransactionStatus,
   type GenLayerTransaction,
+  type FeesDistribution,
+  type MessageFeeAllocationInput,
   type TransactionHash,
 } from "genlayer-js/types";
 import { hexToBytes, type Account, type Address } from "viem";
+import { GENLAYER_CHAIN } from "../genlayer/network";
 
 export type FirstFaultWorkflow = {
   buyer: string;
@@ -143,6 +146,17 @@ export type SettlementEvidence = {
   children: GenLayerTransaction[];
 };
 
+export type FirstFaultFeeQuote = {
+  functionName: string;
+  accountAddress: Address;
+  contractAddress: Address;
+  chainId: number;
+  feeDeposit: bigint;
+  userValue: bigint;
+  distribution: FeesDistribution;
+  messageAllocations?: MessageFeeAllocationInput[];
+};
+
 type ContractAccount = Account | Address;
 
 function asContractAddress(address: Address): CalldataAddress {
@@ -166,7 +180,15 @@ function executionSucceeded(receipt: GenLayerTransaction): boolean {
     && (
       receipt.resultName === TransactionResult.MAJORITY_AGREE
       || receipt.result === Number(TransactionResultNameToNumber.MAJORITY_AGREE)
+      || receipt.result === 6 // Historical Studionet encoding retained for evidence readback.
     );
+}
+
+function submittedWriteSucceeded(receipt: GenLayerTransaction): boolean {
+  const decided = receipt.statusName === TransactionStatus.ACCEPTED
+    || receipt.statusName === TransactionStatus.FINALIZED;
+  return decided
+    && receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN;
 }
 
 /** Headless FirstFault contract boundary shared by browser code and Localnet tests. */
@@ -177,15 +199,17 @@ export default class FirstFault {
     private readonly contractAddress: Address,
     private account?: ContractAccount,
     private readonly endpoint?: string,
-    private readonly onSubmitted?: (hash: TransactionHash) => void,
+    private readonly onSubmitted?: (hash: TransactionHash, action: { functionName: string; args: unknown[] }) => void,
     private readonly version: "v1" | "v2" | "v3" = "v1",
+    private readonly confirmFee?: (quote: FirstFaultFeeQuote) => Promise<void>,
+    private readonly validateBeforeSubmit?: () => Promise<void>,
   ) {
     this.client = this.makeClient(account);
   }
 
   private makeClient(account?: ContractAccount) {
     return createClient({
-      chain: this.endpoint ? localnet : studionet,
+      chain: this.endpoint ? localnet : GENLAYER_CHAIN,
       ...(this.endpoint ? { endpoint: this.endpoint } : {}),
       ...(account ? { account } : {}),
     });
@@ -198,21 +222,50 @@ export default class FirstFault {
 
   private async write(functionName: string, args: unknown[], value = 0n) {
     if (!this.account) throw new Error("A connected account is required");
-    const hash = await this.client.writeContract({
+    const request = {
       address: this.contractAddress,
       functionName,
       args: args as never[],
       value,
+    };
+    const estimate = this.endpoint
+      ? undefined
+      : await this.client.estimateTransactionFeesForWrite(request);
+    if (estimate && this.confirmFee) {
+      const accountAddress = typeof this.account === "string" ? this.account : this.account.address;
+      await this.confirmFee({
+        functionName,
+        accountAddress,
+        contractAddress: this.contractAddress,
+        chainId: GENLAYER_CHAIN.id,
+        feeDeposit: estimate.feeValue,
+        userValue: value,
+        distribution: estimate.distribution,
+        messageAllocations: estimate.messageAllocations,
+      });
+    }
+    await this.validateBeforeSubmit?.();
+    const hash = await this.client.writeContract({
+      ...request,
+      ...(estimate ? {
+        fees: {
+          distribution: estimate.distribution,
+          ...(estimate.messageAllocations
+            ? { messageAllocations: estimate.messageAllocations }
+            : {}),
+          feeValue: estimate.feeValue,
+        },
+      } : {}),
     });
-    this.onSubmitted?.(hash);
+    this.onSubmitted?.(hash, { functionName, args });
     const receipt = await this.client.waitForTransactionReceipt({
       hash,
       status: TransactionStatus.FINALIZED,
       interval: this.endpoint ? 250 : 5_000,
       retries: this.endpoint ? 600 : 120,
     });
-    if (!executionSucceeded(receipt)) {
-      throw new Error(`FirstFault ${functionName} finalized with failed execution`);
+    if (!submittedWriteSucceeded(receipt)) {
+      throw new Error(`FirstFault ${functionName} reached a decision without FINISHED_WITH_RETURN`);
     }
     return receipt;
   }
@@ -358,6 +411,12 @@ export default class FirstFault {
   }
 
   async getTransactionReceipt(hash: TransactionHash): Promise<GenLayerTransaction> {
+    await this.client.waitForTransactionReceipt({
+      hash,
+      waitUntil: "finalized",
+      interval: this.endpoint ? 250 : 5_000,
+      retries: this.endpoint ? 600 : 120,
+    });
     return this.client.getTransaction({ hash });
   }
 

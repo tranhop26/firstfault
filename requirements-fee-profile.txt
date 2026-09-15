@@ -1,0 +1,2 @@
+# Install in a separate virtual environment for Consensus v0.6 fee profiling.
+-r requirements-studio-next.txt

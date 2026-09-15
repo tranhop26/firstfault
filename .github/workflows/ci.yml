@@ -7,8 +7,22 @@ on:
     branches: [main, v2-dev]
 
 jobs:
+  test-studio-next:
+    name: Studio Next V3 Tests
+    runs-on: ubuntu-latest
+    env:
+      GENVM_VERSION: v0.6.0-rc5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-studio-next.txt
+      - run: genvm-lint check contracts/firstfault_v3.py
+      - run: python -m pytest tests/direct/test_v3_*.py -v
+
   test-direct:
-    name: Direct Mode Tests
+    name: Historical V1/V2 Direct Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,4 +30,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - run: python -m pytest tests/direct/ -v
+      - run: >-
+          python -m pytest tests/direct/ -v
+          --ignore=tests/direct/test_v3_addresses.py
+          --ignore=tests/direct/test_v3_funding.py
+          --ignore=tests/direct/test_v3_regression.py
