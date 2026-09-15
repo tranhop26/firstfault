@@ -53,6 +53,21 @@ export type StudioNextRawTransaction = {
   to?: `0x${string}`;
   input?: `0x${string}`;
   value?: `0x${string}`;
+  from_address?: `0x${string}`;
+  to_address?: `0x${string}`;
+  type?: number;
+  data?: {
+    contract_code?: string;
+    contract_address?: `0x${string}`;
+    user_value?: number | string;
+    message_allocations_count?: number | string;
+    fee_value?: number | string;
+    fees_distribution?: Record<string, unknown>;
+  };
+  fees?: {
+    deposit?: number | string;
+    userValue?: number | string;
+  };
 };
 
 export type SubmittedDeploymentEnvelope = {
@@ -60,6 +75,69 @@ export type SubmittedDeploymentEnvelope = {
   feeValue: bigint;
   distribution: FeesDistribution;
 };
+
+function protocolBigInt(value: unknown, label: string): bigint {
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") {
+    throw new Error(`Studio Next ${label} is missing`);
+  }
+  try {
+    const result = BigInt(value);
+    if (result < 0n) throw new Error("negative");
+    return result;
+  } catch {
+    throw new Error(`Studio Next ${label} is invalid`);
+  }
+}
+
+function decodeStudioProjection(
+  raw: StudioNextRawTransaction,
+  expectedDeployer: `0x${string}`,
+): SubmittedDeploymentEnvelope | undefined {
+  if (!raw.from_address && !raw.data?.fees_distribution) return undefined;
+  if (!raw.from_address || getAddress(raw.from_address) !== getAddress(expectedDeployer)) {
+    throw new Error("Studio Next deployment envelope wallet mismatch");
+  }
+  if (raw.type !== 1 || !raw.to_address || getAddress(raw.to_address) === getAddress(zeroAddress)) {
+    throw new Error("Studio Next projection is not a deployment transaction");
+  }
+  const data = raw.data;
+  if (
+    !data?.contract_code
+    || !data.contract_address
+    || getAddress(data.contract_address) !== getAddress(raw.to_address)
+    || protocolBigInt(data.user_value, "user value") !== 0n
+    || protocolBigInt(data.message_allocations_count, "message allocation count") !== 0n
+  ) {
+    throw new Error("Studio Next projection has invalid deployment data");
+  }
+  const feeValue = protocolBigInt(raw.fees?.deposit, "fee deposit");
+  if (
+    feeValue !== protocolBigInt(data.fee_value, "data fee value")
+    || protocolBigInt(raw.fees?.userValue, "fee user value") !== 0n
+  ) {
+    throw new Error("Studio Next projection fee deposit mismatch");
+  }
+  const fees = data.fees_distribution;
+  if (!fees || !Array.isArray(fees.rotations)) {
+    throw new Error("Studio Next projection fee distribution is missing");
+  }
+  return {
+    deployerAddress: getAddress(raw.from_address),
+    feeValue,
+    distribution: {
+      leaderTimeunitsAllocation: protocolBigInt(fees.leaderTimeunitsAllocation, "leader allocation"),
+      validatorTimeunitsAllocation: protocolBigInt(fees.validatorTimeunitsAllocation, "validator allocation"),
+      appealRounds: protocolBigInt(fees.appealRounds, "appeal rounds"),
+      executionBudgetPerRound: protocolBigInt(fees.executionBudgetPerRound, "execution budget"),
+      executionConsumed: protocolBigInt(fees.executionConsumed, "execution consumed"),
+      totalMessageFees: protocolBigInt(fees.totalMessageFees, "message fees"),
+      rotations: fees.rotations.map((value) => protocolBigInt(value, "rotation")),
+      maxPriceGenPerTimeUnit: protocolBigInt(fees.maxPriceGenPerTimeUnit, "maximum time-unit price"),
+      storageFeeMaxGasPrice: protocolBigInt(fees.storageFeeMaxGasPrice, "storage gas price"),
+      receiptFeeMaxGasPrice: protocolBigInt(fees.receiptFeeMaxGasPrice, "receipt gas price"),
+    },
+  };
+}
 
 export function decodeStudioNextDeploymentEnvelope(
   raw: StudioNextRawTransaction | null,
@@ -70,6 +148,8 @@ export function decodeStudioNextDeploymentEnvelope(
   if (!raw || raw.hash?.toLowerCase() !== expectedHash.toLowerCase()) {
     throw new Error("Studio Next deployment envelope hash mismatch");
   }
+  const studioProjection = decodeStudioProjection(raw, expectedDeployer);
+  if (studioProjection) return studioProjection;
   if (!raw.from || getAddress(raw.from) !== getAddress(expectedDeployer)) {
     throw new Error("Studio Next deployment envelope wallet mismatch");
   }

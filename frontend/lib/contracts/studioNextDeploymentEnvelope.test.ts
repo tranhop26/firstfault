@@ -4,6 +4,7 @@ import { encodeFunctionData, zeroAddress } from "viem";
 import {
   decodeStudioNextDeploymentEnvelope,
   studioNextAddTransactionAbi,
+  type StudioNextRawTransaction,
 } from "../../../scripts/studioNextDeploymentEnvelope";
 
 const TX = `0x${"1".repeat(64)}` as `0x${string}`;
@@ -50,6 +51,42 @@ function raw(value = 77n) {
 describe("Studio Next submitted deployment envelope", () => {
   it("recovers the fee quote from the signed on-chain transaction", () => {
     expect(decodeStudioNextDeploymentEnvelope(raw(), TX, DEPLOYER, CONSENSUS)).toEqual({
+      deployerAddress: DEPLOYER,
+      feeValue: 77n,
+      distribution,
+    });
+  });
+
+  it("recovers the fee quote from Studio Next's finalized transaction projection", () => {
+    const studioTransaction = {
+      hash: TX,
+      from_address: DEPLOYER,
+      to_address: `0x${"4".repeat(40)}`,
+      type: 1,
+      data: {
+        contract_code: "IyB7ICJEZXBlbmRzIjogInB5LWdlbmxheWVyOnRlc3QiIH0=",
+        contract_address: `0x${"4".repeat(40)}`,
+        user_value: 0,
+        message_allocations_count: 0,
+        fee_value: "77",
+        fees_distribution: Object.fromEntries(
+          Object.entries(distribution).map(([key, value]) => [
+            key,
+            Array.isArray(value)
+              ? value.map((item) => item.toString())
+              : value.toString(),
+          ]),
+        ),
+      },
+      fees: {
+        deposit: "77",
+        userValue: "0",
+      },
+    } as unknown as StudioNextRawTransaction;
+
+    expect(
+      decodeStudioNextDeploymentEnvelope(studioTransaction, TX, DEPLOYER, CONSENSUS),
+    ).toEqual({
       deployerAddress: DEPLOYER,
       feeValue: 77n,
       distribution,

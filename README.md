@@ -113,7 +113,7 @@ FirstFault V3 is deployed at [`0x9236A835741DF7f891613B5578753647C140124E`](http
 
 ## Live application
 
-The current public site at [https://firstfault.vercel.app](https://firstfault.vercel.app) still serves the historical Studionet V3 deployment. It will be promoted only after a separately confirmed Studio Next deployment is finalized and verified.
+The current public site at [https://firstfault.vercel.app](https://firstfault.vercel.app) still serves the historical Studionet V3 deployment. The Studio Next contract is finalized and verified; promoting the public site remains a separate deployment step.
 
 ### Judge demo — no wallet required
 
@@ -138,6 +138,8 @@ Fresh production reads reconstructed both branches. Across them, custody conserv
 
 ## Studio Next deployment
 
+Status: **Verified on Studio Next.** FirstFault V3 is deployed at [`0xf7136eDe8ba1761562fEcb2147609F3A2932c449`](https://explorer-studio-dev.genlayer.com/address/0xf7136eDe8ba1761562fEcb2147609F3A2932c449) by wallet `0x21b45103dd05c43969daF3CbB4277391777e2eC7`. Deployment transaction [`0x48491d…76a0a`](https://explorer-studio-dev.genlayer.com/tx/0x48491dfc5f18ab2cdc6c74e37e9a427261c3964e5220c61c5e5178108af76a0a) is `FINALIZED` with `FINISHED_WITH_RETURN`. Live RPC readback matched source commit `e9042b0a83afa39cd669cf0ec6e9896d68930034`, SHA-256 `be9a66f6f0a4f694024615f841c362eda8f463fd02ce4d16d4cffbb84dbb0e06`, and the exact 24-method schema recorded in `deployments/studio-next-v3.json`.
+
 After confirming the exact wallet, network, source hash, and intended transaction, set the key in the process environment and run:
 
 ```shell
@@ -159,6 +161,7 @@ The command uses the ignored local pending record when available. If that file c
 
 | Actor | Action | Contract method | Transaction | Finalized/success | Readback |
 |---|---|---|---|---|---|
+| Studio Next deployer | Deploy FirstFault V3 for Agent Tank | Contract deployment | [`0x48491d…76a0a`](https://explorer-studio-dev.genlayer.com/tx/0x48491dfc5f18ab2cdc6c74e37e9a427261c3964e5220c61c5e5178108af76a0a) | `FINALIZED` / `FINISHED_WITH_RETURN`; 3 validators agreed, 2 idle | [Studio Next address](https://explorer-studio-dev.genlayer.com/address/0xf7136eDe8ba1761562fEcb2147609F3A2932c449), exact source hash and 24-method schema verified |
 | Deployer | Deploy frozen FirstFault source | Contract deployment | [`0x47b36d…19e1920`](https://explorer-studio.genlayer.com/tx/0x47b36dcc4b7843534f06f299272e96722086bff2f2c2c0daa983ed14119e1920) | `FINALIZED` / `FINISHED_WITH_RETURN` | [Address](https://explorer-studio.genlayer.com/address/0x2271AE904A97865491e4b24c49532f71B711eD5f), exact source hash and 17-method schema verified |
 | Deployer | Deploy frozen FirstFault V2 successor | Contract deployment | [`0x189c6d…1db2d`](https://explorer-studio.genlayer.com/tx/0x189c6d629cde61aff8893c3d8dcc45ea9908a0a4da95d6a3b7b5b5db3fd1db2d) | `FINALIZED` / `FINISHED_WITH_RETURN` | [V2 address](https://explorer-studio.genlayer.com/address/0x24c060E5394b5bD14a5546B055A7F049f9842987), exact source hash and 20-method schema verified |
 | Deployer | Deploy frozen FirstFault V3 successor | Contract deployment | [`0x9e3d32…b62fdc`](https://explorer-studio.genlayer.com/tx/0x9e3d328e3ec5a325ab25fffa26b006b692f7891d11de05703436304830b62fdc) | `FINALIZED` / `FINISHED_WITH_RETURN` | [V3 address](https://explorer-studio.genlayer.com/address/0x9236A835741DF7f891613B5578753647C140124E), exact source hash and 24-method schema verified |
@@ -177,13 +180,13 @@ The command uses the ignored local pending record when available. If that file c
 | V3 contract | Execute the production-demo settlement | Triggered external transfers | [`Research payout`](https://explorer-studio.genlayer.com/tx/0xa7dc45c69507f18dbec622493ca81b57b6831d71d09934c223bef4b8489db671), [`Publisher payout`](https://explorer-studio.genlayer.com/tx/0xc0c607bcccff569ac847a95817477956b513fd3d1456357d606ce28f0dc8bbb1), [`Writer-hold refund`](https://explorer-studio.genlayer.com/tx/0x689368c746f8afe06c637a7e47cd64fe0c0d026392f038bde5711c81a9f4949a) | All `FINALIZED`, value credited | Three transfers of 1 simulated GEN total the 3 GEN deposit; contract balance reads 0 |
 | Buyer after timeout | Preserve custody safely | `timeout_dispute_to_unresolved` | [`0xdf2b9f…6985e2`](https://explorer-studio.genlayer.com/tx/0xdf2b9f74f65b9e59678ecd9bcdb2594fe9d9fb3409b59dbe1f433bef4d6985e2) | `FINALIZED` / `SUCCESS` | `UNRESOLVED / CONSENSUS_TIMEOUT`; all 3 remains reserved, no payout/refund |
 
-Machine-readable deployment and exercised-flow evidence is recorded in `deployments/studionet.json`, `deployments/studionet-v2.json`, `deployments/studionet-v3.json`, `deployments/studionet-evidence.json`, `deployments/studionet-golden-demo.json`, `deployments/studionet-live-branches.json`, `deployments/studionet-v3-live-evidence.json`, `deployments/studionet-v3-dispute-evidence.json`, and `deployments/vercel.json`.
+Machine-readable deployment and exercised-flow evidence is recorded in `deployments/studio-next-v3.json`, `deployments/studionet.json`, `deployments/studionet-v2.json`, `deployments/studionet-v3.json`, `deployments/studionet-evidence.json`, `deployments/studionet-golden-demo.json`, `deployments/studionet-live-branches.json`, `deployments/studionet-v3-live-evidence.json`, `deployments/studionet-v3-dispute-evidence.json`, and `deployments/vercel.json`.
 
 ## Known limitations
 
 - Every deployed version is intentionally frozen; changing behavior requires a separately deployed and reviewed successor. Existing holds cannot be silently migrated.
 - `UNRESOLVED` deliberately retains reserved value until a contract-governed recovery path succeeds.
-- Localnet and Studionet activity demonstrates development behavior, not production-value settlement.
+- Localnet, Studionet, and Studio Next activity demonstrates development behavior with test GEN, not production-value settlement.
 - Contract accounting deliberately distinguishes scheduled value from external transfer finality. The contract ledger records exact scheduled amounts and recipients; finalized child receipts with `valueCredited=true` are the execution proof surfaced by the frontend.
 
 ## License
