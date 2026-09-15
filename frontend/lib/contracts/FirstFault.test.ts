@@ -6,6 +6,7 @@ const client = vi.hoisted(() => ({
   getTransaction: vi.fn(),
   getTriggeredTransactionIds: vi.fn(),
   waitForTransactionReceipt: vi.fn(),
+  estimateTransactionFeesForWrite: vi.fn(),
   writeContract: vi.fn(),
   readContract: vi.fn(),
   request: vi.fn(),
@@ -70,6 +71,15 @@ function mockSinglePayoutWorkflow(workflowId: string, researcher: string) {
 describe("FirstFault triggered transfer finality", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    client.estimateTransactionFeesForWrite.mockResolvedValue({
+      distribution: {
+        leaderTimeunitsAllocation: 11n,
+        validatorTimeunitsAllocation: 22n,
+        executionBudgetPerRound: 33n,
+      },
+      messageAllocations: [{ budget: 44n }],
+      feeValue: 55n,
+    });
     client.getTriggeredTransactionIds.mockResolvedValue([childHash]);
     client.writeContract.mockResolvedValue(parent.hash);
     client.waitForTransactionReceipt.mockResolvedValue({
@@ -77,6 +87,74 @@ describe("FirstFault triggered transfer finality", () => {
       statusName: "FINALIZED",
       txExecutionResultName: "FINISHED_WITH_RETURN",
     });
+  });
+
+  it("submits the Studio Next fee quote unchanged with every write", async () => {
+    const account = "0x0000000000000000000000000000000000000009" as Address;
+    const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3");
+
+    await adapter.startWorkflow("demo-42", "start-now");
+
+    const request = {
+      address: contractAddress,
+      functionName: "start_workflow",
+      args: ["demo-42", "start-now"],
+      value: 0n,
+    };
+    expect(client.estimateTransactionFeesForWrite).toHaveBeenCalledWith(request);
+    expect(client.writeContract).toHaveBeenCalledWith({
+      ...request,
+      fees: {
+        distribution: {
+          leaderTimeunitsAllocation: 11n,
+          validatorTimeunitsAllocation: 22n,
+          executionBudgetPerRound: 33n,
+        },
+        messageAllocations: [{ budget: 44n }],
+        feeValue: 55n,
+      },
+    });
+  });
+
+  it("does not ask the wallet to sign when fee approval is cancelled", async () => {
+    const account = "0x0000000000000000000000000000000000000009" as Address;
+    const confirmFee = vi.fn(async () => {
+      throw new Error("Transaction cancelled before signing");
+    });
+    const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3", confirmFee);
+
+    await expect(adapter.startWorkflow("demo-42", "start-now"))
+      .rejects.toThrow("Transaction cancelled before signing");
+    expect(confirmFee).toHaveBeenCalledWith(expect.objectContaining({
+      functionName: "start_workflow",
+      accountAddress: account,
+      contractAddress,
+      chainId: 61997,
+      feeDeposit: 55n,
+      userValue: 0n,
+    }));
+    expect(client.writeContract).not.toHaveBeenCalled();
+  });
+
+  it("revalidates wallet and chain identity after fee approval and before signing", async () => {
+    const account = "0x0000000000000000000000000000000000000009" as Address;
+    const validateBeforeSubmit = vi.fn(async () => {
+      throw new Error("Wallet account changed before signing; review the fee again");
+    });
+    const adapter = new FirstFault(
+      contractAddress,
+      account,
+      undefined,
+      undefined,
+      "v3",
+      vi.fn(async () => undefined),
+      validateBeforeSubmit,
+    );
+
+    await expect(adapter.startWorkflow("demo-42", "start-now"))
+      .rejects.toThrow("Wallet account changed before signing");
+    expect(validateBeforeSubmit).toHaveBeenCalledOnce();
+    expect(client.writeContract).not.toHaveBeenCalled();
   });
 
   it("binds recovery writes to exact cure and settlement proposal versions", async () => {
@@ -98,8 +176,24 @@ describe("FirstFault triggered transfer finality", () => {
     const account = "0x0000000000000000000000000000000000000009" as Address;
     const adapter = new FirstFault(contractAddress, account, undefined, accepted);
     await adapter.startWorkflow("demo-42", "start-now");
-    expect(accepted).toHaveBeenCalledWith(parent.hash);
+    expect(accepted).toHaveBeenCalledWith(parent.hash, {
+      functionName: "start_workflow",
+      args: ["demo-42", "start-now"],
+    });
     expect(accepted.mock.invocationCallOrder[0]).toBeLessThan(client.waitForTransactionReceipt.mock.invocationCallOrder[0]);
+  });
+
+  it("waits for a recovered parent to finalize before reading its authoritative receipt", async () => {
+    const adapter = new FirstFault(contractAddress, undefined, "http://127.0.0.1:4000/api");
+    await adapter.getTransactionReceipt(parent.hash!);
+    expect(client.waitForTransactionReceipt).toHaveBeenCalledWith({
+      hash: parent.hash,
+      waitUntil: "finalized",
+      interval: 250,
+      retries: 600,
+    });
+    expect(client.waitForTransactionReceipt.mock.invocationCallOrder[0])
+      .toBeLessThan(client.getTransaction.mock.invocationCallOrder[0]);
   });
 
   it("waits for every external child transfer to finalize", async () => {
@@ -352,6 +446,6 @@ describe("FirstFault triggered transfer finality", () => {
     const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3");
 
     await expect(adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1"))
-      .rejects.toThrow("finalized with failed execution");
+      .rejects.toThrow("without FINISHED_WITH_RETURN");
   });
 });

@@ -10,6 +10,7 @@ import { TransactionStatus } from "@/components/firstfault/TransactionStatus";
 import { FundingPanel } from "@/components/firstfault/FundingPanel";
 import { RecoveryPanel } from "@/components/firstfault/RecoveryPanel";
 import { CaseSubnav } from "@/components/firstfault/CaseSubnav";
+import { FeeApprovalDialog } from "@/components/firstfault/FeeApprovalDialog";
 import { canWrite } from "@/lib/firstfault/status";
 import { formatGen } from "@/lib/firstfault/amounts";
 import { isDisputeTimeoutReady } from "@/lib/firstfault/recovery";
@@ -50,7 +51,7 @@ export default function HomePage() {
   return (
     <div className="ff-app">
       <header className="ff-header">
-        <div className="ff-topbar"><div className="ff-shell"><span>FirstFault for agentic commerce</span><nav><a href="#how">How it works</a><a href="https://docs.genlayer.com" target="_blank" rel="noreferrer">GenLayer docs</a><span className="ff-network-dot">Studionet</span></nav></div></div>
+        <div className="ff-topbar"><div className="ff-shell"><span>FirstFault for agentic commerce</span><nav><a href="#how">How it works</a><a href="https://docs.genlayer.com" target="_blank" rel="noreferrer">GenLayer docs</a><span className="ff-network-dot">Studio Next</span></nav></div></div>
         <div className="ff-mainbar"><div className="ff-shell ff-mainbar-inner">
           <div className="ff-brand-cluster"><a className="ff-logo" href="#"><span className="ff-logo-mark">F</span><span>FirstFault<small>verifiable agent settlement</small></span></a><AgentTankBadge /></div>
           <form className="ff-search" onSubmit={(event) => { event.preventDefault(); setWorkflowId(search.trim()); }}><input aria-label="Workflow ID" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by exact workflow ID" /><button>Inspect case</button></form>
@@ -68,7 +69,7 @@ export default function HomePage() {
           <h1>When agent work breaks,<br /><em>find where trust broke first.</em></h1>
           <p>Bind three paid agent steps, preserve their evidence, and let GenLayer decide the earliest material breach. Compliant holds move; disputed value stays protected.</p>
           <div className="ff-hero-actions"><WorkflowComposer disabled={!writable} onCreate={create} status={app.status} parentHash={app.parentHash} childHashes={app.childHashes} /><button className="ff-button ff-button-ghost" onClick={() => document.getElementById("how")?.scrollIntoView()}>See the decision flow ↓</button></div>
-          <p className="ff-simulated-note">All GEN shown here is simulated Studionet value.</p>
+          <p className="ff-simulated-note">All GEN shown here is simulated Studio Next test value.</p>
         </div><div className="ff-hero-art" aria-hidden="true"><div className="ff-orbit one"/><div className="ff-orbit two"/><div className="ff-agent a">R</div><div className="ff-agent b">W</div><div className="ff-agent c">P</div><div className="ff-shield">✓<span>BOUND<br/>EVIDENCE</span></div></div></div></section>
 
         <section className="ff-state-strip"><div className="ff-shell ff-state-grid">
@@ -76,7 +77,7 @@ export default function HomePage() {
         </div></section>
 
         <div className="ff-shell ff-content">
-          {!app.configured && <section className="ff-config-error"><strong>Deployment address required</strong><p>Set <code>NEXT_PUBLIC_CONTRACT_ADDRESS</code> to the real Studionet deployment. FirstFault will not substitute a fake contract.</p></section>}
+          {!app.configured && <section className="ff-config-error"><strong>Deployment address required</strong><p>Set <code>NEXT_PUBLIC_CONTRACT_ADDRESS</code> to the verified Studio Next deployment. FirstFault will not substitute a fake contract.</p></section>}
 
           {!workflowId && <>
             <section className="ff-intro" id="how"><div className="ff-section-head"><div><span className="ff-eyebrow">One narrow, complete workflow</span><h2>From immutable brief to defensible settlement</h2></div></div>
@@ -90,7 +91,7 @@ export default function HomePage() {
             <section className="ff-proof-band"><div><span>NO ADMIN VERDICT</span><strong>The deployer cannot rewrite the outcome.</strong></div><div><span>NO FAVORABLE DEFAULT</span><strong>Missing evidence keeps disputed holds reserved.</strong></div><div><span>NO FRONTEND FICTION</span><strong>Refresh reconstructs every state from the contract.</strong></div></section>
           </>}
 
-          {workflowId && app.loading && <section className="ff-loading"><div/><div/><div/><p>Reading contract state from Studionet…</p></section>}
+          {workflowId && app.loading && <section className="ff-loading"><div/><div/><div/><p>Reading contract state from Studio Next…</p></section>}
           {workflowId && app.readError && !app.loading && <section className="ff-not-found"><span>⌕</span><h2>Workflow could not be read</h2><p>{app.readError}</p><button className="ff-button ff-button-primary" onClick={() => app.refresh()}>Try readback again</button></section>}
 
           {app.workflow && !app.loading && <>
@@ -126,7 +127,8 @@ export default function HomePage() {
           </>}
         </div>
       </main>
-      <footer><div className="ff-shell"><div className="ff-footer-brand"><div className="ff-logo"><span className="ff-logo-mark">F</span><span>FirstFault</span></div><AgentTankBadge compact /></div><p>Built for Agent Tank · Powered by GenLayer Studionet<br/>{app.contractVersion === "v2" ? "V2 recovery contract" : "Intentionally frozen contract"} · simulated Studionet value</p><div><a href="https://genlayer.com" target="_blank" rel="noreferrer">GenLayer</a><a href="https://explorer-studio.genlayer.com" target="_blank" rel="noreferrer">Explorer</a></div></div></footer>
+      <FeeApprovalDialog quote={app.feeApproval} onApprove={app.approveFee} onCancel={app.cancelFee} />
+      <footer><div className="ff-shell"><div className="ff-footer-brand"><div className="ff-logo"><span className="ff-logo-mark">F</span><span>FirstFault</span></div><AgentTankBadge compact /></div><p>Built for Agent Tank · Powered by GenLayer Studio Next<br/>{app.contractVersion === "v2" ? "V2 recovery contract" : "Intentionally frozen contract"} · simulated Studio Next value</p><div><a href="https://genlayer.com" target="_blank" rel="noreferrer">GenLayer</a><a href="https://explorer-studio-dev.genlayer.com" target="_blank" rel="noreferrer">Explorer</a></div></div></footer>
     </div>
   );
 }

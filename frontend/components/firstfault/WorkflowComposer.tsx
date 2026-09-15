@@ -63,7 +63,7 @@ export function WorkflowComposer({ disabled, onCreate, status, parentHash, child
       </div>
       {formError && <p className="ff-config-error" role="alert">{formError}</p>}
       {status.phase !== "READY" && <TransactionStatus status={status} parentHash={parentHash} childHashes={childHashes} />}
-      <div className="ff-modal-actions"><button className="ff-button ff-button-outline" onClick={() => setOpen(false)}>Cancel</button><button className="ff-button ff-button-primary" disabled={disabled} onClick={create}>Create on Studionet</button></div>
+      <div className="ff-modal-actions"><button className="ff-button ff-button-outline" onClick={() => setOpen(false)}>Cancel</button><button className="ff-button ff-button-primary" disabled={disabled} onClick={create}>Create on Studio Next</button></div>
     </section></div>}
   </>;
 }

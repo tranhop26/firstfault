@@ -5,6 +5,10 @@ type StorageHost = { readonly localStorage?: ReconciliationStorage };
 
 const transactionHashPattern = /^0x[0-9a-f]{64}$/i;
 
+export function reconciliationKey(contractAddress: string, workflowId: string): string {
+  return `firstfault:parent:${contractAddress.toLowerCase()}:${workflowId.trim()}`;
+}
+
 export function getReconciliationStorage(host: object): ReconciliationStorage | null {
   try {
     return (host as StorageHost).localStorage ?? null;

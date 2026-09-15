@@ -11,6 +11,7 @@ import { RecoveryPanel } from "./RecoveryPanel";
 import { EvidencePanel } from "./EvidencePanel";
 import { FundingPanel } from "./FundingPanel";
 import { CaseSubnav } from "./CaseSubnav";
+import { FeeApprovalDialog } from "./FeeApprovalDialog";
 
 afterEach(() => {
   cleanup();
@@ -193,7 +194,7 @@ describe("FirstFault truthful interface", () => {
     const onCreate = vi.fn();
     render(<WorkflowComposer disabled={false} onCreate={onCreate} status={{ phase: "READY", label: "Ready", detail: "Ready" }} parentHash={null} childHashes={[]} />);
     fireEvent.click(screen.getByRole("button", { name: /create workflow/i }));
-    fireEvent.click(screen.getByRole("button", { name: /create on studionet/i }));
+    fireEvent.click(screen.getByRole("button", { name: /create on studio next/i }));
     expect(onCreate).not.toHaveBeenCalled();
     expect(screen.getByRole("alert").textContent).toMatch(/required/i);
   });
@@ -210,7 +211,7 @@ describe("FirstFault truthful interface", () => {
     expect(screen.getByText(/remains reserved/i)).toBeTruthy();
   });
 
-  it("links transaction evidence to the canonical Studionet explorer", () => {
+  it("links transaction evidence to the canonical Studio Next explorer", () => {
     const parentHash = `0x${"a".repeat(64)}`;
     const childHash = `0x${"b".repeat(64)}`;
     render(
@@ -221,9 +222,9 @@ describe("FirstFault truthful interface", () => {
       />,
     );
     expect(screen.getByRole("link", { name: /parent transaction/i }).getAttribute("href"))
-      .toBe(`https://explorer-studio.genlayer.com/tx/${parentHash}`);
+      .toBe(`https://explorer-studio-dev.genlayer.com/tx/${parentHash}`);
     expect(screen.getByRole("link", { name: /transfer 1/i }).getAttribute("href"))
-      .toBe(`https://explorer-studio.genlayer.com/tx/${childHash}`);
+      .toBe(`https://explorer-studio-dev.genlayer.com/tx/${childHash}`);
   });
 
   it("keeps a rejected create action handled inside the workflow dialog", async () => {
@@ -232,7 +233,7 @@ describe("FirstFault truthful interface", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /create workflow/i }));
     fillValidWorkflowForm("duplicate-workflow");
-    fireEvent.click(screen.getByRole("button", { name: "Create on Studionet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create on Studio Next" }));
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
     expect(screen.getByRole("dialog", { name: /create a three-agent workflow/i })).toBeTruthy();
@@ -242,11 +243,11 @@ describe("FirstFault truthful interface", () => {
 
   it("closes the workflow dialog after a successful create action", async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined);
-    render(<WorkflowComposer disabled={false} onCreate={onCreate} status={{ phase: "READY", label: "Ready", detail: "Contract state is loaded from Studionet." }} parentHash={null} childHashes={[]} />);
+    render(<WorkflowComposer disabled={false} onCreate={onCreate} status={{ phase: "READY", label: "Ready", detail: "Contract state is loaded from Studio Next." }} parentHash={null} childHashes={[]} />);
 
     fireEvent.click(screen.getByRole("button", { name: /create workflow/i }));
     fillValidWorkflowForm();
-    fireEvent.click(screen.getByRole("button", { name: "Create on Studionet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create on Studio Next" }));
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
     await waitFor(() => expect(screen.queryByRole("dialog", { name: /create a three-agent workflow/i })).toBeNull());
@@ -257,7 +258,7 @@ describe("FirstFault truthful interface", () => {
     const view = render(<WorkflowComposer disabled={false} {...props} />);
     fireEvent.click(screen.getByRole("button", { name: /create workflow/i }));
     view.rerender(<WorkflowComposer disabled={true} {...props} />);
-    expect((screen.getByRole("button", { name: /create on studionet/i }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /create on studio next/i }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("requires authoritative intent readback before V3 funding", () => {
@@ -271,7 +272,7 @@ describe("FirstFault truthful interface", () => {
     render(<FundingPanel amount="3000000000000000000" intent={{
       workflow_id: "demo-42", intent_id: "intent-1", buyer: steps[0].worker,
       expected_amount: "3000000000000000000", expires_at: "1788534000", version: "7",
-      chain_id: "61999", contract_address: `0x${"9".repeat(40)}`, nonce: "prepare-1",
+      chain_id: "61997", contract_address: `0x${"9".repeat(40)}`, nonce: "prepare-1",
       intent_hash: "abc", consumed: false,
     }} outcome={null} phase="INTENT_READY" disabled={false}
       onPrepare={() => undefined} onFund={() => undefined} />);
@@ -301,5 +302,29 @@ describe("FirstFault truthful interface", () => {
     }} phase="REFUND_FINALIZED" disabled={false} onPrepare={() => undefined} onFund={() => undefined} />);
     expect(screen.getByText(/full refund finalized/i)).toBeTruthy();
     expect(screen.getByText(/credited to the original sender/i)).toBeTruthy();
+  });
+
+  it("labels the Studio Next fee as a refundable deposit before wallet signing", () => {
+    const approve = vi.fn();
+    render(<FeeApprovalDialog quote={{
+      functionName: "adjudicate",
+      accountAddress: "0x0000000000000000000000000000000000000009",
+      contractAddress: "0x0000000000000000000000000000000000000001",
+      chainId: 61997,
+      feeDeposit: 1_250_000_000_000_000_000n,
+      userValue: 0n,
+      distribution: {
+        leaderTimeunitsAllocation: 10n, validatorTimeunitsAllocation: 20n,
+        appealRounds: 1n, executionBudgetPerRound: 30n, executionConsumed: 0n,
+        totalMessageFees: 40n, rotations: [0n, 0n], maxPriceGenPerTimeUnit: 1n,
+        storageFeeMaxGasPrice: 1n, receiptFeeMaxGasPrice: 1n,
+      },
+    }} onApprove={approve} onCancel={() => undefined} />);
+
+    expect(screen.getByText("1.25 GEN")).toBeTruthy();
+    expect(screen.getByText(/Chain 61997/)).toBeTruthy();
+    expect(screen.getByText(/not the fee consumed/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /continue to wallet/i }));
+    expect(approve).toHaveBeenCalledOnce();
   });
 });

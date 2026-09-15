@@ -1,6 +1,7 @@
 import type { ProjectedStatus } from "@/lib/firstfault/status";
+import { GENLAYER_EXPLORER_URL } from "../../lib/genlayer/network";
 
-const explorer = "https://explorer-studio.genlayer.com/tx";
+const explorer = `${GENLAYER_EXPLORER_URL}/tx`;
 
 export function TransactionStatus({ status, parentHash, childHashes }: { status: ProjectedStatus; parentHash: string | null; childHashes: string[] }) {
   const tone = status.phase === "ERROR" ? "danger" : status.phase === "SUCCESS" ? "success" : status.phase === "UNRESOLVED" ? "warning" : "info";

@@ -1,20 +1,23 @@
 "use client";
 
 import { createClient } from "genlayer-js";
-import { studionet } from "genlayer-js/chains";
 import { createWalletClient, custom, type WalletClient } from "viem";
+import {
+  GENLAYER_CHAIN,
+  GENLAYER_CHAIN_ID,
+  GENLAYER_CHAIN_ID_HEX,
+  GENLAYER_EXPLORER_URL,
+  GENLAYER_NETWORK,
+  GENLAYER_RPC_URL,
+} from "./network";
 
-// Studionet is the single source for chain metadata used by wallet and contract clients.
-export const GENLAYER_CHAIN_ID = studionet.id;
-export const GENLAYER_CHAIN_ID_HEX = `0x${GENLAYER_CHAIN_ID.toString(16).toUpperCase()}`;
-export const GENLAYER_EXPLORER_URL = "https://explorer-studio.genlayer.com";
-
-export const GENLAYER_NETWORK = {
-  chainId: GENLAYER_CHAIN_ID_HEX,
-  chainName: studionet.name,
-  nativeCurrency: studionet.nativeCurrency,
-  rpcUrls: [...studionet.rpcUrls.default.http],
-  blockExplorerUrls: [GENLAYER_EXPLORER_URL],
+export {
+  GENLAYER_CHAIN,
+  GENLAYER_CHAIN_ID,
+  GENLAYER_CHAIN_ID_HEX,
+  GENLAYER_EXPLORER_URL,
+  GENLAYER_NETWORK,
+  GENLAYER_RPC_URL,
 };
 
 // Ethereum provider type from window
@@ -35,9 +38,7 @@ declare global {
  * Get the GenLayer RPC URL from environment variables
  */
 export function getStudioUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_GENLAYER_RPC_URL || "https://studio.genlayer.com/api"
-  );
+  return GENLAYER_RPC_URL;
 }
 
 /**
@@ -283,7 +284,7 @@ export function createMetaMaskWalletClient(): WalletClient | null {
 
   try {
     return createWalletClient({
-      chain: studionet as any,
+      chain: GENLAYER_CHAIN as any,
       transport: custom(provider),
     });
   } catch (error) {
@@ -301,7 +302,7 @@ export function createMetaMaskWalletClient(): WalletClient | null {
  */
 export function createGenLayerClient(address?: string) {
   const config: any = {
-    chain: studionet,
+    chain: GENLAYER_CHAIN,
   };
 
   if (address) {
@@ -314,7 +315,7 @@ export function createGenLayerClient(address?: string) {
     console.error("Error creating GenLayer client:", error);
     // Return client without account on error
     return createClient({
-      chain: studionet,
+      chain: GENLAYER_CHAIN,
     });
   }
 }

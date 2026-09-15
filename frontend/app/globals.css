@@ -35,6 +35,8 @@
 .ff-funding-refund { border-color: #d39b2a; background: #fff8e8; }
 
 #workflow-desk,#evidence,#disputes,#recovery{scroll-margin-top:16px}
+.ff-fee-modal{width:min(560px,100%)}.ff-fee-total{display:grid;gap:5px;background:#effcf5;border:1px solid #abefc6;padding:18px;margin:20px 0}.ff-fee-total span{font-size:11px;text-transform:uppercase;color:#05603a;font-weight:700}.ff-fee-total strong{font-size:28px;color:#05603a}.ff-fee-total small{color:#365e4c;line-height:1.45}.ff-fee-breakdown{display:grid;gap:0;margin:0;border:1px solid var(--line)}.ff-fee-breakdown>div{display:flex;justify-content:space-between;gap:18px;padding:11px 13px;border-bottom:1px solid var(--line)}.ff-fee-breakdown>div:last-child{border-bottom:0}.ff-fee-breakdown dt{color:var(--muted);font-size:12px}.ff-fee-breakdown dd{margin:0;font-size:12px;font-weight:700;text-align:right}.ff-fee-value{padding:12px;background:#fff7f3;color:#71352b!important}
+.ff-fee-binding{padding:10px 12px;background:#f5f7fa;color:#344054!important;font-size:12px;word-break:break-word}
 .ff-modal .ff-form-help{margin:2px 0 0;padding:12px 14px;border-left:3px solid var(--orange-deep);background:#fff4f0;color:#71352b;font-size:14px;font-weight:600;line-height:1.55}
 .ff-modal input::placeholder,.ff-modal textarea::placeholder,.ff-search input::placeholder,.ff-submit-box input::placeholder,.ff-submit-box textarea::placeholder,.ff-action-card textarea::placeholder,.ff-recovery input::placeholder,.ff-recovery textarea::placeholder{color:#646871;opacity:1}
 .ff-eyebrow{color:var(--orange-deep)}
