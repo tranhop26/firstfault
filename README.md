@@ -78,7 +78,7 @@ NEXT_PUBLIC_CONTRACT_VERSION=v3
 
 ```shell
 genvm-lint check contracts/firstfault_v3.py
-python -m pytest tests/direct -q
+python -m pytest tests/direct/test_v3_*.py -q
 npm --prefix frontend test -- --exclude lib/contracts/FirstFault.localnet.test.ts
 npm run verify:deployment
 npm run lint
@@ -86,7 +86,7 @@ npm run lint:deploy
 npm run build
 ```
 
-The contract keeps its exact pinned GenVM runtime and its previously verified source bytes. Consensus v0.6 fee profiling uses the prerelease tools in `requirements-fee-profile.txt`; install those in a separate virtual environment so the historical direct-test runner remains reproducible.
+The contract keeps its exact pinned GenVM runtime and its previously verified source bytes. Install `requirements-studio-next.txt` in a separate virtual environment for V3 tests and lint. CI pins `GENVM_VERSION=v0.6.0-rc5`, the manager bundle containing the deployed contract's runner. Historical V1/V2 tests continue to use `requirements.txt` because those contracts target the earlier runtime.
 
 With Localnet running at `http://127.0.0.1:4000/api`:
 
