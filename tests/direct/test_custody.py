@@ -118,6 +118,17 @@ def schedule_transfers(direct_vm):
     scheduled = []
 
     def capture(_vm, request):
+        message = request.get("EmitExternalMessage")
+        if message is not None:
+            scheduled.append(
+                {
+                    "address": message["address"],
+                    "value": message["value"],
+                    "on": "finalized",
+                    "external": True,
+                }
+            )
+            return {"ok": None}
         message = request.get("PostMessage")
         if message is not None:
             scheduled.append({**message, "external": False})

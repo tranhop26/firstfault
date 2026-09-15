@@ -106,9 +106,14 @@ def run_with_simulated_consensus_rollback(direct_vm, call):
 def warp_authoritative_transaction_time(direct_vm, timestamp):
     """Advance the direct runner's VM clock and its cached raw message timestamp."""
     direct_vm.warp(timestamp)
-    import genlayer.gl as runtime_gl
+    try:
+        import genlayer.message as runtime_message
 
-    runtime_gl.message_raw["datetime"] = timestamp
+        runtime_message.raw["datetime"] = timestamp
+    except ImportError:  # v0.2 runner compatibility for historical contracts
+        import genlayer.gl as runtime_gl
+
+        runtime_gl.message_raw["datetime"] = timestamp
 
 
 def make_disputed(
