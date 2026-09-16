@@ -98,6 +98,20 @@ describe("WalletProvider selected provider session", () => {
     expect(screen.getByTestId("address").textContent).toBe("none");
   });
 
+  it("clears loading when a wallet extension never answers", async () => {
+    const okx = new EventProvider(() => new Promise(() => undefined));
+    render(<WalletProvider
+      registry={registry({ id: "okx", name: "OKX Wallet", provider: okx })}
+      connectionTimeoutMs={20}
+    >
+      <WalletProbe />
+    </WalletProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+
+    await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
+    expect(screen.getByTestId("wallet-name").textContent).toBe("none");
+  });
+
   it("updates from the active provider and clears the session on disconnect", async () => {
     const okx = new EventProvider(async ({ method }) => {
       if (method === "eth_requestAccounts" || method === "eth_accounts") return [ADDRESS];

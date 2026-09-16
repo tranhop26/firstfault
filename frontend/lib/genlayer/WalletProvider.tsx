@@ -77,6 +77,7 @@ interface WalletContextValue extends WalletState {
 interface WalletProviderProps {
   children: ReactNode;
   registry?: WalletProviderRegistry;
+  connectionTimeoutMs?: number;
 }
 
 const initialState: WalletState = {
@@ -103,7 +104,30 @@ function errorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : "Unexpected wallet error";
 }
 
-export function WalletProvider({ children, registry: suppliedRegistry }: WalletProviderProps) {
+function withConnectionTimeout<T>(promise: Promise<T>, timeoutMs: number, walletName: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(
+      () => reject(new Error(`${walletName} did not respond. Open the wallet and try again.`)),
+      timeoutMs,
+    );
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (cause) => {
+        window.clearTimeout(timeout);
+        reject(cause);
+      },
+    );
+  });
+}
+
+export function WalletProvider({
+  children,
+  registry: suppliedRegistry,
+  connectionTimeoutMs = 30_000,
+}: WalletProviderProps) {
   const activeRegistry = useMemo(
     () => suppliedRegistry ?? getBrowserWalletProviderRegistry(),
     [suppliedRegistry],
@@ -197,7 +221,11 @@ export function WalletProvider({ children, registry: suppliedRegistry }: WalletP
 
     setState((previous) => ({ ...previous, isLoading: true, pendingWalletId: walletId }));
     try {
-      const address = await connectWalletProvider(record);
+      const address = await withConnectionTimeout(
+        connectWalletProvider(record),
+        connectionTimeoutMs,
+        record.name,
+      );
       const chainId = await getCurrentChainId(record.provider);
       const correctNetwork = await isOnGenLayerNetwork(record.provider);
       setState((previous) => ({
@@ -228,7 +256,7 @@ export function WalletProvider({ children, registry: suppliedRegistry }: WalletP
       }
       throw cause;
     }
-  }, [activeRegistry]);
+  }, [activeRegistry, connectionTimeoutMs]);
 
   const disconnectWallet = useCallback(() => {
     setState((previous) => ({
