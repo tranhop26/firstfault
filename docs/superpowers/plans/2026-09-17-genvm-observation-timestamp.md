@@ -4,7 +4,7 @@
 
 **Goal:** Prevent Studio Next fee simulation from rejecting current FirstFault evidence as `Observation is in the future`.
 
-**Architecture:** Add one pure frontend timestamp helper that applies a fixed 60-second safety margin and clamps at zero. Route both step and cure evidence submissions through that helper, leaving the frozen Intelligent Contract, custody flow, and fee-confirmation gate unchanged.
+**Architecture:** Add one pure frontend timestamp helper that applies a fixed 60-second safety margin and clamps at zero. Route both evidence submissions through it, then extend the existing Studio simulation-clock recovery so only the exact future-observation error retries once with an explicit GenVM datetime; leave the frozen contract, custody flow, and fee-confirmation gate unchanged.
 
 **Tech Stack:** TypeScript 5.9, Vitest 3.2, React 19, Next.js 16, `genlayer-js@2.0.0-rc.1`, Transaction Kit RC2, Vercel.
 
@@ -160,7 +160,75 @@ git add -- frontend/lib/hooks/useFirstFault.ts frontend/lib/hooks/useFirstFaultT
 git commit -m "fix: use safe timestamps for evidence writes"
 ```
 
-### Task 3: Verify, deploy, and prove the live fix
+### Task 3: Recover stale Studio evidence simulations with TDD
+
+**Files:**
+- Modify: `frontend/lib/contracts/FirstFault.ts:170-210,310-330`
+- Test: `frontend/lib/contracts/FirstFault.test.ts`
+
+**Interfaces:**
+- Consumes: decoded Studio receipt errors and the original `sim_estimateTransactionFees` parameters.
+- Produces: one clock-refreshed fee simulation for `submit_step` and `submit_cure` only when the decoded result equals `Observation is in the future`.
+
+- [ ] **Step 1: Add failing adapter tests**
+
+Add a parameterized test covering both `submit_step` and `submit_cure`. Mock `estimateTransactionFeesForWrite` to reject with a Studio receipt whose result is base64 for `Observation is in the future`, mock `client.request` with a valid recommended preset, and assert the request includes:
+
+```ts
+{
+  method: "sim_estimateTransactionFees",
+  params: [{
+    ...originalParams,
+    sim_config: { genvm_datetime: "2026-09-17T00:00:00.000Z" },
+  }],
+}
+```
+
+Also extend the unrelated-error test to assert `client.request` and `client.writeContract` are not called.
+
+- [ ] **Step 2: Run the adapter tests and verify RED**
+
+```powershell
+npm test -- lib/contracts/FirstFault.test.ts
+```
+
+Expected: the new evidence-clock cases fail because only `prepare_funding` currently supports the simulation-clock retry.
+
+- [ ] **Step 3: Generalize the exact-error parser and retry gate**
+
+Replace the funding-only parser with:
+
+```ts
+function simulationParamsForContractError(
+  error: unknown,
+  expectedMessage: string,
+): UnknownRecord | undefined {
+  const cause = asRecord(asRecord(error)?.cause);
+  const data = asRecord(cause?.data);
+  const receipt = asRecord(data?.receipt);
+  if (decodeStudioContractResult(receipt?.result) !== expectedMessage) return undefined;
+  return asRecord(data?.params);
+}
+```
+
+In `estimateWriteFees`, map `prepare_funding` to `Invalid funding intent expiry`, map `submit_step` and `submit_cure` to `Observation is in the future`, and return the original error unchanged for every other function or decoded message. Retry once with the existing `sim_config.genvm_datetime` request and normalization.
+
+- [ ] **Step 4: Run focused tests and verify GREEN**
+
+```powershell
+npm test -- lib/contracts/FirstFault.test.ts lib/firstfault/observationTimestamp.test.ts lib/hooks/useFirstFaultTimestamp.test.ts
+```
+
+Expected: all adapter and timestamp tests pass.
+
+- [ ] **Step 5: Commit the simulation recovery**
+
+```powershell
+git add -- frontend/lib/contracts/FirstFault.ts frontend/lib/contracts/FirstFault.test.ts
+git commit -m "fix: refresh GenVM clock for evidence simulation"
+```
+
+### Task 4: Verify, deploy, and prove the live fix
 
 **Files:**
 - Verify only: `frontend/`
