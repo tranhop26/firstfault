@@ -24,6 +24,7 @@ import {
   writeReconciliationHash,
 } from "@/lib/firstfault/reconciliationStorage";
 import { runExclusiveWrite } from "@/lib/firstfault/writeGate";
+import { observationTimestamp } from "../firstfault/observationTimestamp";
 
 function evidence(receipt: GenLayerTransaction): TransactionEvidence {
   const externalTransferSucceeded = receipt.type === 0 && receipt.statusName === TransactionStatus.FINALIZED;
@@ -350,7 +351,7 @@ export function useFirstFault(workflowId: string) {
     fund,
     start: () => run(() => contract!.startWorkflow(workflowId, nonce("start"))),
     submitStep: (stepIndex: number, output: string, upstreamHash: string, sourceUrl: string) =>
-      run(async () => (await contract!.submitStep(workflowId, stepIndex, output, upstreamHash, sourceUrl, BigInt(Math.floor(Date.now() / 1000)), nonce(`step-${stepIndex}`))).receipt),
+      run(async () => (await contract!.submitStep(workflowId, stepIndex, output, upstreamHash, sourceUrl, observationTimestamp(), nonce(`step-${stepIndex}`))).receipt),
     accept: () => run(() => contract!.acceptWorkflow(workflowId, nonce("accept"))),
     dispute: (reason: string) => run(() => contract!.openDispute(workflowId, reason, nonce("dispute"))),
     adjudicate: () => run(() => contract!.adjudicate(workflowId, nonce("adjudicate"))),
@@ -359,7 +360,7 @@ export function useFirstFault(workflowId: string) {
     timeoutIncomplete: () => run(() => contract!.timeoutIncompleteToUnresolved(workflowId, nonce("timeout-incomplete"))),
     timeoutReview: () => run(() => contract!.timeoutReviewToUnresolved(workflowId, nonce("timeout-review"))),
     retryAdjudication: () => run(() => contract!.retryAdjudication(workflowId, nonce("retry-adjudication"))),
-    submitCure: (evidenceText: string, sourceUrl: string) => run(() => contract!.submitCure(workflowId, evidenceText, sourceUrl, BigInt(Math.floor(Date.now() / 1000)), nonce("cure"))),
+    submitCure: (evidenceText: string, sourceUrl: string) => run(() => contract!.submitCure(workflowId, evidenceText, sourceUrl, observationTimestamp(), nonce("cure"))),
     proposeSettlement: (amounts: readonly [bigint, bigint, bigint, bigint]) => run(() => contract!.proposeMutualSettlement(workflowId, amounts, nonce("proposal"))),
     approveSettlement: (version: bigint, hash: string) => run(() => contract!.approveMutualSettlement(workflowId, version, hash, nonce("approval"))),
     executeSettlement: () => run(() => contract!.executeMutualSettlement(workflowId, nonce("execute-settlement"))),
