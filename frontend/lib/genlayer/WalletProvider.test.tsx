@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { WalletProvider, useWallet } from "./WalletProvider";
@@ -128,6 +128,38 @@ describe("WalletProvider selected provider session", () => {
     await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(NEXT_ADDRESS));
 
     fireEvent.click(screen.getByRole("button", { name: "disconnect" }));
+    expect(screen.getByTestId("wallet-name").textContent).toBe("none");
+    expect(screen.getByTestId("address").textContent).toBe("none");
+  });
+
+  it("ignores an in-flight provider event after disconnect", async () => {
+    let delayChainRead = false;
+    let releaseChainRead: (() => void) | undefined;
+    const okx = new EventProvider(async ({ method }) => {
+      if (method === "eth_requestAccounts" || method === "eth_accounts") return [ADDRESS];
+      if (method === "eth_chainId" && delayChainRead) {
+        return new Promise<string>((resolve) => {
+          releaseChainRead = () => {
+            delayChainRead = false;
+            resolve("0xf22d");
+          };
+        });
+      }
+      if (method === "eth_chainId") return "0xf22d";
+      return null;
+    });
+    render(<WalletProvider registry={registry({ id: "okx", name: "OKX Wallet", provider: okx })}>
+      <WalletProbe />
+    </WalletProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(ADDRESS));
+
+    delayChainRead = true;
+    okx.emit("accountsChanged", [NEXT_ADDRESS]);
+    await waitFor(() => expect(releaseChainRead).toBeTypeOf("function"));
+    fireEvent.click(screen.getByRole("button", { name: "disconnect" }));
+    await act(async () => releaseChainRead?.());
+
     expect(screen.getByTestId("wallet-name").textContent).toBe("none");
     expect(screen.getByTestId("address").textContent).toBe("none");
   });

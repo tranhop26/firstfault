@@ -46,11 +46,14 @@ const walletName = (id: WalletId): WalletProviderRecord["name"] => (
   id === "metamask" ? "MetaMask" : "OKX Wallet"
 );
 
-function classifyAnnouncement(info: Eip6963ProviderInfo): WalletId | null {
+function classifyAnnouncement(
+  info: Eip6963ProviderInfo,
+  provider: Eip1193Provider,
+): WalletId | null {
+  if (provider.isPhantom) return null;
   const rdns = info.rdns.toLowerCase();
-  const name = info.name.toLowerCase();
-  if (rdns === "io.metamask" || name === "metamask") return "metamask";
-  if (rdns.includes("okx") || rdns.includes("okex") || name === "okx wallet") return "okx";
+  if (rdns === "io.metamask") return "metamask";
+  if (rdns === "com.okex.wallet") return "okx";
   return null;
 }
 
@@ -86,7 +89,7 @@ export function createWalletProviderRegistry(target: ProviderEventTarget): Walle
     const detail = (event as CustomEvent<Eip6963ProviderDetail>).detail;
     if (!detail?.info || !detail.provider || announcementIds.has(detail.info.uuid)) return;
     announcementIds.add(detail.info.uuid);
-    const id = classifyAnnouncement(detail.info);
+    const id = classifyAnnouncement(detail.info, detail.provider);
     if (id) add(id, detail.provider, detail.info);
   };
 

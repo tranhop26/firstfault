@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { WalletChooserDialog } from "./WalletChooserDialog";
@@ -49,5 +50,28 @@ describe("WalletChooserDialog", () => {
       wallets={wallets} pendingWalletId={null} onSelect={() => undefined} />);
     fireEvent.click(screen.getByRole("button", { name: "Close wallet chooser" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("moves focus into the dialog and returns it to the opener after Escape", async () => {
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      return <>
+        <button onClick={() => setOpen(true)}>Open wallet chooser</button>
+        <WalletChooserDialog open={open} onOpenChange={setOpen}
+          wallets={wallets} pendingWalletId={null} onSelect={() => undefined} />
+      </>;
+    }
+
+    render(<Harness />);
+    const opener = screen.getByRole("button", { name: "Open wallet chooser" });
+    opener.focus();
+    fireEvent.click(opener);
+
+    const dialog = await screen.findByRole("dialog", { name: "Choose a wallet" });
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+    fireEvent.keyDown(document.activeElement ?? dialog, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(opener));
   });
 });

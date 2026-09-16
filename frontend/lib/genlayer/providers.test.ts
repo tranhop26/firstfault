@@ -51,6 +51,19 @@ describe("wallet provider registry", () => {
     expect(registry.list().map((wallet) => wallet.id)).toEqual(["metamask", "okx"]);
   });
 
+  it("rejects Phantom and lookalike announcements that spoof supported wallet names", () => {
+    const target = new FakeProviderWindow();
+    const phantomAsMetaMask = provider({ isMetaMask: true, isPhantom: true });
+    const okxLookalike = provider();
+    const registry = createWalletProviderRegistry(target);
+
+    registry.start();
+    target.announce(info("spoof-mm", "MetaMask", "app.phantom"), phantomAsMetaMask);
+    target.announce(info("spoof-okx", "OKX Wallet", "wallet.okx-lookalike.example"), okxLookalike);
+
+    expect(registry.list()).toEqual([]);
+  });
+
   it("uses exact legacy providers and ignores an arbitrary window.ethereum", () => {
     const target = new FakeProviderWindow();
     const generic = provider();

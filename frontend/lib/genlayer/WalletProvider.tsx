@@ -6,6 +6,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -133,6 +134,7 @@ export function WalletProvider({
     [suppliedRegistry],
   );
   const [state, setState] = useState<WalletState>(initialState);
+  const activeProviderRef = useRef<Eip1193Provider | null>(null);
 
   useEffect(() => {
     if (!activeRegistry) {
@@ -162,6 +164,7 @@ export function WalletProvider({
     const handleAccountsChanged = async (accounts: string[]) => {
       const chainId = await getCurrentChainId(provider);
       const correctNetwork = await isOnGenLayerNetwork(provider);
+      if (activeProviderRef.current !== provider) return;
       setState((previous) => ({
         ...previous,
         address: accounts[0] || null,
@@ -172,6 +175,7 @@ export function WalletProvider({
     };
     const handleChainChanged = async (chainId: string) => {
       const accounts = await getAccounts(provider);
+      if (activeProviderRef.current !== provider) return;
       setState((previous) => ({
         ...previous,
         address: accounts[0] || null,
@@ -181,6 +185,7 @@ export function WalletProvider({
       }));
     };
     const handleDisconnect = () => {
+      activeProviderRef.current = null;
       setState((previous) => ({
         ...previous,
         address: null,
@@ -228,6 +233,7 @@ export function WalletProvider({
       );
       const chainId = await getCurrentChainId(record.provider);
       const correctNetwork = await isOnGenLayerNetwork(record.provider);
+      activeProviderRef.current = record.provider;
       setState((previous) => ({
         ...previous,
         address,
@@ -259,6 +265,7 @@ export function WalletProvider({
   }, [activeRegistry, connectionTimeoutMs]);
 
   const disconnectWallet = useCallback(() => {
+    activeProviderRef.current = null;
     setState((previous) => ({
       ...previous,
       address: null,
