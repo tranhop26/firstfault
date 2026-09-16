@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { useEffect, useRef, useState } from "react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -13,7 +15,30 @@ const wallets: WalletOption[] = [
   { id: "okx", name: "OKX Wallet", installed: true, installUrl: "https://www.okx.com/web3" },
 ];
 
+const appCss = readFileSync(resolve(process.cwd(), "app/globals.css"), "utf8");
+
 describe("WalletChooserDialog", () => {
+  it("keeps the portalled chooser fixed, centered, and above its overlay", () => {
+    const style = document.createElement("style");
+    style.textContent = appCss;
+    document.head.append(style);
+    render(<WalletChooserDialog open onOpenChange={() => undefined}
+      wallets={wallets} pendingWalletId={null} onSelect={() => undefined} />);
+
+    const dialog = screen.getByRole("dialog", { name: "Choose a wallet" });
+    const overlay = document.querySelector(".ff-modal-backdrop");
+    const dialogStyle = getComputedStyle(dialog);
+    const overlayStyle = getComputedStyle(overlay!);
+
+    expect(dialog.parentElement).toBe(document.body);
+    expect(dialogStyle.position).toBe("fixed");
+    expect(dialogStyle.top).toBe("50%");
+    expect(dialogStyle.left).toBe("50%");
+    expect(dialogStyle.transform).toBe("translate(-50%,-50%)");
+    expect(Number(dialogStyle.zIndex)).toBeGreaterThan(Number(overlayStyle.zIndex));
+    style.remove();
+  });
+
   it("offers both supported wallets and selects only the requested wallet", () => {
     const onSelect = vi.fn();
     render(<WalletChooserDialog open onOpenChange={() => undefined}
