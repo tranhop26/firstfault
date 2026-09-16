@@ -12,8 +12,9 @@ import FirstFault, {
   type FirstFaultFeeQuote,
 } from "@/lib/contracts/FirstFault";
 import type { FundingPhase } from "@/components/firstfault/FundingPanel";
-import { GENLAYER_CHAIN_ID, getContractAddress, getContractVersion } from "@/lib/genlayer/client";
+import { getContractAddress, getContractVersion } from "@/lib/genlayer/client";
 import { useWallet } from "@/lib/genlayer/WalletProvider";
+import { validateSelectedWalletBeforeSubmit } from "@/lib/genlayer/walletValidation";
 import { projectTransactionStatus, type TransactionEvidence } from "@/lib/firstfault/status";
 import {
   clearReconciliationHash,
@@ -61,20 +62,10 @@ export function useFirstFault(workflowId: string) {
     setFeeApproval(quote);
   }), []);
   const validateBeforeSubmit = useCallback(async () => {
-    const provider = window.ethereum;
+    const provider = wallet.provider;
     if (!provider || !wallet.address) throw new Error("Wallet disconnected before signing");
-    const [rawChainId, rawAccounts] = await Promise.all([
-      provider.request({ method: "eth_chainId" }),
-      provider.request({ method: "eth_accounts" }),
-    ]);
-    const chainId = typeof rawChainId === "string" ? Number.parseInt(rawChainId, 16) : Number(rawChainId);
-    const accounts = Array.isArray(rawAccounts) ? rawAccounts : [];
-    const activeAddress = typeof accounts[0] === "string" ? accounts[0] : "";
-    if (chainId !== GENLAYER_CHAIN_ID) throw new Error("Wallet network changed before signing; switch back to Studio Next");
-    if (activeAddress.toLowerCase() !== wallet.address.toLowerCase()) {
-      throw new Error("Wallet account changed before signing; review the fee again");
-    }
-  }, [wallet.address]);
+    await validateSelectedWalletBeforeSubmit(provider, wallet.address);
+  }, [wallet.address, wallet.provider]);
   const contract = useMemo(
     () => configured ? new FirstFault(
       configuredAddress as Address,
@@ -92,8 +83,9 @@ export function useFirstFault(workflowId: string) {
       contractVersion,
       confirmFee,
       validateBeforeSubmit,
+      wallet.provider ?? undefined,
     ) : null,
-    [configured, configuredAddress, contractVersion, confirmFee, reconciliationKey, validateBeforeSubmit, wallet.address],
+    [configured, configuredAddress, contractVersion, confirmFee, reconciliationKey, validateBeforeSubmit, wallet.address, wallet.provider],
   );
   const [receipt, setReceipt] = useState<TransactionEvidence | null>(null);
   const [children, setChildren] = useState<TransactionEvidence[]>([]);

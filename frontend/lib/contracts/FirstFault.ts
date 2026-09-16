@@ -13,6 +13,7 @@ import {
 } from "genlayer-js/types";
 import { hexToBytes, type Account, type Address } from "viem";
 import { GENLAYER_CHAIN } from "../genlayer/network";
+import type { Eip1193Provider } from "../genlayer/providers";
 
 export type FirstFaultWorkflow = {
   buyer: string;
@@ -203,6 +204,7 @@ export default class FirstFault {
     private readonly version: "v1" | "v2" | "v3" = "v1",
     private readonly confirmFee?: (quote: FirstFaultFeeQuote) => Promise<void>,
     private readonly validateBeforeSubmit?: () => Promise<void>,
+    private readonly provider?: Eip1193Provider,
   ) {
     this.client = this.makeClient(account);
   }
@@ -212,6 +214,7 @@ export default class FirstFault {
       chain: this.endpoint ? localnet : GENLAYER_CHAIN,
       ...(this.endpoint ? { endpoint: this.endpoint } : {}),
       ...(account ? { account } : {}),
+      ...(!this.endpoint && this.provider ? { provider: this.provider } : {}),
     });
   }
 

@@ -11,8 +11,12 @@ const client = vi.hoisted(() => ({
   readContract: vi.fn(),
   request: vi.fn(),
 }));
+const createClientMock = vi.hoisted(() => vi.fn());
 
-vi.mock("genlayer-js", () => ({ createClient: () => client }));
+vi.mock("genlayer-js", () => ({ createClient: (config: unknown) => {
+  createClientMock(config);
+  return client;
+} }));
 
 import FirstFault from "./FirstFault";
 
@@ -87,6 +91,31 @@ describe("FirstFault triggered transfer finality", () => {
       statusName: "FINALIZED",
       txExecutionResultName: "FINISHED_WITH_RETURN",
     });
+  });
+
+  it("constructs browser writes with the exact selected provider", () => {
+    const account = "0x0000000000000000000000000000000000000009" as Address;
+    const provider = {
+      request: vi.fn(),
+      on: vi.fn(),
+      removeListener: vi.fn(),
+    };
+
+    new FirstFault(
+      contractAddress,
+      account,
+      undefined,
+      undefined,
+      "v3",
+      undefined,
+      undefined,
+      provider,
+    );
+
+    expect(createClientMock).toHaveBeenCalledWith(expect.objectContaining({
+      account,
+      provider,
+    }));
   });
 
   it("submits the Studio Next fee quote unchanged with every write", async () => {
