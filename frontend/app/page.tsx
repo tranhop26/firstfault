@@ -11,6 +11,7 @@ import { FundingPanel } from "@/components/firstfault/FundingPanel";
 import { RecoveryPanel } from "@/components/firstfault/RecoveryPanel";
 import { CaseSubnav } from "@/components/firstfault/CaseSubnav";
 import { FeeApprovalDialog } from "@/components/firstfault/FeeApprovalDialog";
+import { WalletChooserDialog } from "@/components/firstfault/WalletChooserDialog";
 import { canWrite } from "@/lib/firstfault/status";
 import { formatGen } from "@/lib/firstfault/amounts";
 import { isDisputeTimeoutReady } from "@/lib/firstfault/recovery";
@@ -24,6 +25,7 @@ export default function HomePage() {
   const [search, setSearch] = useState("");
   const [rejection, setRejection] = useState("");
   const [nowSeconds, setNowSeconds] = useState(0);
+  const [walletChooserOpen, setWalletChooserOpen] = useState(false);
   const app = useFirstFault(workflowId);
   const writable = canWrite({ connected: app.wallet.isConnected, correctNetwork: app.wallet.isOnCorrectNetwork, configured: app.configured }) && !app.actionPending;
   const isBuyer = Boolean(app.workflow && app.wallet.address?.toLowerCase() === app.workflow.buyer.toLowerCase());
@@ -56,11 +58,26 @@ export default function HomePage() {
           <div className="ff-brand-cluster"><a className="ff-logo" href="#"><span className="ff-logo-mark">F</span><span>FirstFault<small>verifiable agent settlement</small></span></a><AgentTankBadge /></div>
           <form className="ff-search" onSubmit={(event) => { event.preventDefault(); setWorkflowId(search.trim()); }}><input aria-label="Workflow ID" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by exact workflow ID" /><button>Inspect case</button></form>
           <div className="ff-wallet">
-            {app.wallet.isConnected ? <><span title={app.wallet.address ?? ""}>{short(app.wallet.address ?? "")}</span><button onClick={app.wallet.disconnectWallet}>Disconnect</button></> : <button className="ff-connect" onClick={() => app.wallet.connectWallet()}>Connect wallet</button>}
+            {app.wallet.isConnected ? <><span title={app.wallet.address ?? ""}>{app.wallet.walletName} · {short(app.wallet.address ?? "")}</span><button onClick={app.wallet.disconnectWallet}>Disconnect</button></> : <button className="ff-connect" onClick={() => setWalletChooserOpen(true)}>Connect wallet</button>}
           </div>
         </div></div>
         <CaseSubnav contractVersion={app.contractVersion} hasWorkflow={Boolean(app.workflow)} recoveryAvailable={app.workflow?.state === "UNRESOLVED"} />
       </header>
+
+      <WalletChooserDialog
+        open={walletChooserOpen}
+        onOpenChange={setWalletChooserOpen}
+        wallets={app.wallet.availableWallets}
+        pendingWalletId={app.wallet.pendingWalletId}
+        onSelect={async (walletId) => {
+          try {
+            await app.wallet.connectWallet(walletId);
+            setWalletChooserOpen(false);
+          } catch {
+            // The wallet context presents the actionable error and leaves the chooser open.
+          }
+        }}
+      />
 
       <main>
         <section className="ff-hero"><div className="ff-shell ff-hero-grid"><div>
