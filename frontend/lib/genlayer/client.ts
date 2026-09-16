@@ -1,7 +1,6 @@
 "use client";
 
 import { createClient } from "genlayer-js";
-import { createWalletClient, custom, type WalletClient } from "viem";
 import {
   GENLAYER_CHAIN,
   GENLAYER_CHAIN_ID,
@@ -10,6 +9,7 @@ import {
   GENLAYER_NETWORK,
   GENLAYER_RPC_URL,
 } from "./network";
+import type { Eip1193Provider, WalletProviderRecord } from "./providers";
 
 export {
   GENLAYER_CHAIN,
@@ -20,37 +20,32 @@ export {
   GENLAYER_RPC_URL,
 };
 
-// Ethereum provider type from window
-interface EthereumProvider {
-  isMetaMask?: boolean;
-  request: (args: { method: string; params?: any[] }) => Promise<any>;
-  on: (event: string, handler: (...args: any[]) => void) => void;
-  removeListener: (event: string, handler: (...args: any[]) => void) => void;
-}
-
 declare global {
   interface Window {
-    ethereum?: EthereumProvider;
+    ethereum?: Eip1193Provider;
+    okxwallet?: Eip1193Provider;
   }
 }
 
-/**
- * Get the GenLayer RPC URL from environment variables
- */
+type ProviderError = Error & { code?: number };
+
+function providerError(error: unknown, fallback: string): ProviderError {
+  const source = error as { code?: number; message?: string };
+  const wrapped = new Error(source?.message || fallback) as ProviderError;
+  if (typeof source?.code === "number") wrapped.code = source.code;
+  return wrapped;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
 export function getStudioUrl(): string {
   return GENLAYER_RPC_URL;
 }
 
-/**
- * Get the contract address from environment variables
- */
 export function getContractAddress(): string {
-  const address = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
-  if (!address) {
-    // Return empty string during build, error will be shown in UI during runtime
-    return "";
-  }
-  return address;
+  return process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 }
 
 export function getContractVersion(): "v1" | "v2" | "v3" {
@@ -58,273 +53,102 @@ export function getContractVersion(): "v1" | "v2" | "v3" {
   return version === "v3" ? "v3" : version === "v2" ? "v2" : "v1";
 }
 
-/**
- * Check if MetaMask is installed
- */
-export function isMetaMaskInstalled(): boolean {
-  if (typeof window === "undefined") return false;
-  return !!window.ethereum?.isMetaMask;
-}
-
-/**
- * Get the Ethereum provider (MetaMask)
- */
-export function getEthereumProvider(): EthereumProvider | null {
-  if (typeof window === "undefined") return null;
-  return window.ethereum || null;
-}
-
-/**
- * Request accounts from MetaMask
- * @returns Array of addresses
- */
-export async function requestAccounts(): Promise<string[]> {
-  const provider = getEthereumProvider();
-
-  if (!provider) {
-    throw new Error("MetaMask is not installed");
-  }
-
+export async function requestAccounts(provider: Eip1193Provider, walletName: string): Promise<string[]> {
   try {
-    const accounts = await provider.request({
-      method: "eth_requestAccounts",
-    });
-    return accounts;
-  } catch (error: any) {
-    if (error.code === 4001) {
-      throw new Error("User rejected the connection request");
-    }
-    throw new Error(`Failed to connect to MetaMask: ${error.message}`);
+    return stringArray(await provider.request({ method: "eth_requestAccounts" }));
+  } catch (cause) {
+    throw providerError(cause, `Failed to connect to ${walletName}`);
   }
 }
 
-/**
- * Get current MetaMask accounts without requesting permission
- * @returns Array of addresses
- */
-export async function getAccounts(): Promise<string[]> {
-  const provider = getEthereumProvider();
-
-  if (!provider) {
-    return [];
-  }
-
+export async function getAccounts(provider: Eip1193Provider): Promise<string[]> {
   try {
-    const accounts = await provider.request({
-      method: "eth_accounts",
-    });
-    return accounts;
-  } catch (error) {
-    console.error("Error getting accounts:", error);
+    return stringArray(await provider.request({ method: "eth_accounts" }));
+  } catch (cause) {
+    console.error("Error getting wallet accounts:", cause);
     return [];
   }
 }
 
-/**
- * Get the current chain ID from MetaMask
- */
-export async function getCurrentChainId(): Promise<string | null> {
-  const provider = getEthereumProvider();
-
-  if (!provider) {
-    return null;
-  }
-
+export async function getCurrentChainId(provider: Eip1193Provider): Promise<string | null> {
   try {
-    const chainId = await provider.request({
-      method: "eth_chainId",
-    });
-    return chainId;
-  } catch (error) {
-    console.error("Error getting chain ID:", error);
+    const chainId = await provider.request({ method: "eth_chainId" });
+    return typeof chainId === "string" ? chainId : null;
+  } catch (cause) {
+    console.error("Error getting wallet chain ID:", cause);
     return null;
   }
 }
 
-/**
- * Add GenLayer network to MetaMask
- */
-export async function addGenLayerNetwork(): Promise<void> {
-  const provider = getEthereumProvider();
-
-  if (!provider) {
-    throw new Error("MetaMask is not installed");
-  }
-
+export async function addGenLayerNetwork(provider: Eip1193Provider, walletName: string): Promise<void> {
   try {
     await provider.request({
       method: "wallet_addEthereumChain",
       params: [GENLAYER_NETWORK],
     });
-  } catch (error: any) {
-    if (error.code === 4001) {
-      throw new Error("User rejected adding the network");
-    }
-    throw new Error(`Failed to add GenLayer network: ${error.message}`);
+  } catch (cause) {
+    throw providerError(cause, `Failed to add Studio Next to ${walletName}`);
   }
 }
 
-/**
- * Switch to GenLayer network
- */
-export async function switchToGenLayerNetwork(): Promise<void> {
-  const provider = getEthereumProvider();
-
-  if (!provider) {
-    throw new Error("MetaMask is not installed");
-  }
-
+export async function switchToGenLayerNetwork(provider: Eip1193Provider, walletName: string): Promise<void> {
   try {
     await provider.request({
       method: "wallet_switchEthereumChain",
       params: [{ chainId: GENLAYER_CHAIN_ID_HEX }],
     });
-  } catch (error: any) {
-    // If the chain is not added, add it
-    if (error.code === 4902) {
-      await addGenLayerNetwork();
-    } else if (error.code === 4001) {
-      throw new Error("User rejected switching the network");
-    } else {
-      throw new Error(`Failed to switch network: ${error.message}`);
+  } catch (cause) {
+    const error = cause as { code?: number };
+    if (error?.code === 4902) {
+      await addGenLayerNetwork(provider, walletName);
+      return;
     }
+    throw providerError(cause, `Failed to switch ${walletName} to Studio Next`);
   }
 }
 
-/**
- * Check if we're on the GenLayer network
- */
-export async function isOnGenLayerNetwork(): Promise<boolean> {
-  const chainId = await getCurrentChainId();
-
-  if (!chainId) {
-    return false;
-  }
-
-  // Convert both to decimal for comparison
-  const currentChainIdDecimal = parseInt(chainId, 16);
-  return currentChainIdDecimal === GENLAYER_CHAIN_ID;
+export async function isOnGenLayerNetwork(provider: Eip1193Provider): Promise<boolean> {
+  const chainId = await getCurrentChainId(provider);
+  return chainId !== null && Number.parseInt(chainId, 16) === GENLAYER_CHAIN_ID;
 }
 
-/**
- * Connect to MetaMask and ensure we're on GenLayer network
- * @returns The connected address
- */
-export async function connectMetaMask(): Promise<string> {
-  if (!isMetaMaskInstalled()) {
-    throw new Error("MetaMask is not installed");
+export async function connectWalletProvider(record: WalletProviderRecord): Promise<string> {
+  const accounts = await requestAccounts(record.provider, record.name);
+  const address = accounts[0];
+  if (!address) throw new Error(`No account returned by ${record.name}`);
+
+  if (!(await isOnGenLayerNetwork(record.provider))) {
+    await switchToGenLayerNetwork(record.provider, record.name);
   }
-
-  // Request accounts
-  const accounts = await requestAccounts();
-
-  if (!accounts || accounts.length === 0) {
-    throw new Error("No accounts found");
+  if (!(await isOnGenLayerNetwork(record.provider))) {
+    throw new Error(`${record.name} is not connected to Studio Next`);
   }
-
-  // Check and switch to GenLayer network
-  const onCorrectNetwork = await isOnGenLayerNetwork();
-
-  if (!onCorrectNetwork) {
-    await switchToGenLayerNetwork();
-  }
-
-  return accounts[0];
+  return address;
 }
 
-/**
- * Request user to switch MetaMask account
- * Shows MetaMask account picker even if already connected
- * Uses wallet_requestPermissions to force account selection dialog
- * @returns The newly selected account address
- */
-export async function switchAccount(): Promise<string> {
-  const provider = getEthereumProvider();
-
-  if (!provider) {
-    throw new Error("MetaMask is not installed");
-  }
-
+export async function switchAccount(provider: Eip1193Provider, walletName: string): Promise<string> {
   try {
-    // Request permissions - this shows account picker
     await provider.request({
       method: "wallet_requestPermissions",
       params: [{ eth_accounts: {} }],
     });
-
-    // Get the newly selected account
-    const accounts = await provider.request({
-      method: "eth_accounts",
-    });
-
-    if (!accounts || accounts.length === 0) {
-      throw new Error("No account selected");
-    }
-
+    const accounts = stringArray(await provider.request({ method: "eth_accounts" }));
+    if (!accounts[0]) throw new Error(`No account selected in ${walletName}`);
     return accounts[0];
-  } catch (error: any) {
-    if (error.code === 4001) {
-      throw new Error("User rejected account switch");
-    } else if (error.code === -32002) {
-      throw new Error("Account switch request already pending");
-    }
-    throw new Error(`Failed to switch account: ${error.message}`);
+  } catch (cause) {
+    throw providerError(cause, `Failed to switch account in ${walletName}`);
   }
 }
 
-/**
- * Create a viem wallet client from MetaMask provider
- */
-export function createMetaMaskWalletClient(): WalletClient | null {
-  const provider = getEthereumProvider();
-
-  if (!provider) {
-    return null;
-  }
-
-  try {
-    return createWalletClient({
-      chain: GENLAYER_CHAIN as any,
-      transport: custom(provider),
-    });
-  } catch (error) {
-    console.error("Error creating wallet client:", error);
-    return null;
-  }
-}
-
-/**
- * Create a GenLayer client with MetaMask account
- *
- * Note: The genlayer-js SDK doesn't directly support custom transports like viem.
- * When an address is provided, the SDK will use the window.ethereum provider
- * automatically for transaction signing via MetaMask.
- */
-export function createGenLayerClient(address?: string) {
-  const config: any = {
+export function createGenLayerClient(address?: string, provider?: Eip1193Provider) {
+  return createClient({
     chain: GENLAYER_CHAIN,
-  };
-
-  if (address) {
-    config.account = address as `0x${string}`;
-  }
-
-  try {
-    return createClient(config);
-  } catch (error) {
-    console.error("Error creating GenLayer client:", error);
-    // Return client without account on error
-    return createClient({
-      chain: GENLAYER_CHAIN,
-    });
-  }
+    ...(address ? { account: address as `0x${string}` } : {}),
+    ...(provider ? { provider } : {}),
+  });
 }
 
-/**
- * Get a client instance with MetaMask account
- */
-export async function getClient() {
-  const accounts = await getAccounts();
-  const address = accounts[0];
-  return createGenLayerClient(address);
+export async function getClient(provider?: Eip1193Provider) {
+  const address = provider ? (await getAccounts(provider))[0] : undefined;
+  return createGenLayerClient(address, provider);
 }
