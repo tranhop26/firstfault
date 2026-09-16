@@ -51,6 +51,34 @@ function mockFundingExpiryRetry(feeValue: unknown, executionBudgetPerRound: unkn
   } });
 }
 
+function mockRecommendedSimulation() {
+  client.request.mockResolvedValueOnce({
+    receipt: {
+      execution_result: "SUCCESS",
+      genvm_result: {
+        fee_accounting: {
+          recommended_fee_preset: {
+            distribution: {
+              leaderTimeunitsAllocation: 100,
+              validatorTimeunitsAllocation: 200,
+              appealRounds: 0,
+              executionBudgetPerRound: 153459600000000,
+              executionConsumed: 0,
+              totalMessageFees: 0,
+              rotations: [3],
+              maxPriceGenPerTimeUnit: 2,
+              storageFeeMaxGasPrice: 300000000,
+              receiptFeeMaxGasPrice: 300000000,
+            },
+            feeValue: 613838400010352,
+            messageAllocations: [],
+          },
+        },
+      },
+    },
+  });
+}
+
 function mockSinglePayoutWorkflow(workflowId: string, researcher: string) {
   client.readContract.mockResolvedValueOnce(JSON.stringify({
     workflow_id: workflowId,
@@ -234,6 +262,63 @@ describe("FirstFault triggered transfer finality", () => {
       }));
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    {
+      functionName: "submit_step",
+      run: async (adapter: FirstFault) => {
+        client.readContract.mockResolvedValueOnce(JSON.stringify({
+          workflow_id: "v3-demo",
+          step_index: 0,
+          worker: "0x0000000000000000000000000000000000000009",
+          amount: "1",
+          deadline: "2000",
+          state: "SUBMITTED",
+          brief: "research",
+          output_hash: "0xabc",
+        }));
+        await adapter.submitStep("v3-demo", 0, "verified", "", "https://example.com", 1000n, "step-1");
+      },
+    },
+    {
+      functionName: "submit_cure",
+      run: async (adapter: FirstFault) => {
+        await adapter.submitCure("v3-demo", "verified", "https://example.com", 1000n, "cure-1");
+      },
+    },
+  ])("refreshes the GenVM clock for $functionName future-observation simulation", async ({ run }) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-17T00:00:00.000Z"));
+    try {
+      const account = "0x0000000000000000000000000000000000000009" as Address;
+      const originalParams = { type: "write", to: contractAddress, from: account, data: "0x1234" };
+      client.estimateTransactionFeesForWrite.mockRejectedValueOnce({
+        cause: {
+          data: {
+            params: originalParams,
+            receipt: { result: "AU9ic2VydmF0aW9uIGlzIGluIHRoZSBmdXR1cmU=" },
+          },
+        },
+      });
+      mockRecommendedSimulation();
+      const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3");
+
+      await run(adapter);
+
+      expect(client.request).toHaveBeenCalledWith({
+        method: "sim_estimateTransactionFees",
+        params: [{
+          ...originalParams,
+          sim_config: { genvm_datetime: "2026-09-17T00:00:00.000Z" },
+        }],
+      });
+      expect(client.writeContract).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      client.request.mockReset();
+      client.readContract.mockReset();
     }
   });
 

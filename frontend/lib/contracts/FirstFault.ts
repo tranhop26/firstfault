@@ -183,11 +183,14 @@ function decodeStudioContractResult(result: unknown): string | undefined {
   }
 }
 
-function fundingExpirySimulationParams(error: unknown): UnknownRecord | undefined {
+function simulationParamsForContractError(
+  error: unknown,
+  expectedMessage: string,
+): UnknownRecord | undefined {
   const cause = asRecord(asRecord(error)?.cause);
   const data = asRecord(cause?.data);
   const receipt = asRecord(data?.receipt);
-  if (decodeStudioContractResult(receipt?.result) !== "Invalid funding intent expiry") return undefined;
+  if (decodeStudioContractResult(receipt?.result) !== expectedMessage) return undefined;
   return asRecord(data?.params);
 }
 
@@ -313,8 +316,14 @@ export default class FirstFault {
     try {
       return await this.client.estimateTransactionFeesForWrite(request);
     } catch (error) {
-      if (request.functionName !== "prepare_funding") throw error;
-      const params = fundingExpirySimulationParams(error);
+      const expectedMessage =
+        request.functionName === "prepare_funding"
+          ? "Invalid funding intent expiry"
+          : request.functionName === "submit_step" || request.functionName === "submit_cure"
+            ? "Observation is in the future"
+            : undefined;
+      if (!expectedMessage) throw error;
+      const params = simulationParamsForContractError(error, expectedMessage);
       if (!params) throw error;
       const result = await (this.client as unknown as {
         request(args: { method: string; params: [UnknownRecord] }): Promise<unknown>;
