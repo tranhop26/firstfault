@@ -24,6 +24,33 @@ const contractAddress = "0x0000000000000000000000000000000000000001" as Address;
 const parent = { hash: `0x${"1".repeat(64)}` as TransactionHash } as GenLayerTransaction;
 const childHash = `0x${"2".repeat(64)}` as TransactionHash;
 
+function mockFundingExpiryRetry(feeValue: unknown, executionBudgetPerRound: unknown, rotations: unknown[]) {
+  client.estimateTransactionFeesForWrite.mockRejectedValueOnce({
+    cause: { data: {
+      params: { type: "write", to: contractAddress, data: "0x1234" },
+      receipt: { result: "AUludmFsaWQgZnVuZGluZyBpbnRlbnQgZXhwaXJ5" },
+    } },
+  });
+  client.request.mockResolvedValueOnce({ receipt: {
+    execution_result: "SUCCESS",
+    genvm_result: { fee_accounting: { recommended_fee_preset: {
+      feeValue,
+      distribution: {
+        leaderTimeunitsAllocation: 11,
+        validatorTimeunitsAllocation: 22,
+        appealRounds: 0,
+        executionBudgetPerRound,
+        executionConsumed: 0,
+        totalMessageFees: 0,
+        rotations,
+        maxPriceGenPerTimeUnit: 2,
+        storageFeeMaxGasPrice: 300000000,
+        receiptFeeMaxGasPrice: 300000000,
+      },
+    } } },
+  } });
+}
+
 function mockSinglePayoutWorkflow(workflowId: string, researcher: string) {
   client.readContract.mockResolvedValueOnce(JSON.stringify({
     workflow_id: workflowId,
@@ -187,7 +214,7 @@ describe("FirstFault triggered transfer finality", () => {
       });
       const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3");
 
-      await adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1").catch(() => undefined);
+      await adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1");
 
       expect(client.request).toHaveBeenCalledWith({
         method: "sim_estimateTransactionFees",
@@ -261,6 +288,62 @@ describe("FirstFault triggered transfer finality", () => {
       userValue: 0n,
     }));
     expect(client.writeContract).not.toHaveBeenCalled();
+  });
+
+  describe.each(["feeValue", "executionBudgetPerRound", "rotations"] as const)("invalid recommended preset %s", (field) => {
+    it.each([
+      ["blank string", ""],
+      ["whitespace string", " \t\n"],
+      ["negative bigint", -1n],
+      ["negative number", -1],
+      ["negative string", "-1"],
+      ["positive signed string", "+1"],
+      ["decimal string", "1.5"],
+      ["exponent string", "1e3"],
+      ["hexadecimal string", "0x10"],
+      ["leading zero string", "01"],
+      ["padded decimal string", " 1 "],
+      ["decimal string with a trailing newline", "1\n"],
+      ["fractional number", 1.5],
+      ["unsafe integer", Number.MAX_SAFE_INTEGER + 1],
+      ["NaN", NaN],
+      ["infinity", Infinity],
+      ["boolean", true],
+      ["null", null],
+      ["undefined", undefined],
+      ["object", {}],
+      ["array", []],
+    ])("rejects %s before any wallet write", async (_label, value) => {
+      mockFundingExpiryRetry(
+        field === "feeValue" ? value : 55,
+        field === "executionBudgetPerRound" ? value : 33,
+        field === "rotations" ? [value] : [3],
+      );
+      const adapter = new FirstFault(contractAddress, "0x0000000000000000000000000000000000000009");
+
+      await expect(adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1"))
+        .rejects.toThrow(/^Studio fee simulation returned no valid recommended preset$/);
+      expect(client.writeContract).not.toHaveBeenCalled();
+    });
+  });
+
+  it.each([
+    ["zero bigint", 0n, 0n],
+    ["positive bigint", 123n, 123n],
+    ["zero number", 0, 0n],
+    ["safe integer", Number.MAX_SAFE_INTEGER, 9007199254740991n],
+    ["zero string", "0", 0n],
+    ["canonical decimal string", "123", 123n],
+    ["large decimal string", "9007199254740993", 9007199254740993n],
+  ])("accepts recommended preset %s without precision loss", async (_label, value, expected) => {
+    mockFundingExpiryRetry(value, value, [value]);
+    const adapter = new FirstFault(contractAddress, "0x0000000000000000000000000000000000000009");
+
+    await adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1");
+    expect(client.writeContract).toHaveBeenCalledWith(expect.objectContaining({ fees: expect.objectContaining({
+      feeValue: expected,
+      distribution: expect.objectContaining({ executionBudgetPerRound: expected, rotations: [expected] }),
+    }) }));
   });
 
   it("revalidates wallet and chain identity after fee approval and before signing", async () => {
@@ -588,5 +671,39 @@ describe("FirstFault triggered transfer finality", () => {
 
     await expect(adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1"))
       .rejects.toThrow("without successful execution evidence");
+  });
+
+  it.each([
+    ["transaction error despite leader success", {
+      txExecutionResultName: "FINISHED_WITH_ERROR",
+      consensus_data: { leader_receipt: [{ execution_result: "SUCCESS" }] },
+    }],
+    ["unknown transaction result despite leader success", {
+      txExecutionResultName: "UNKNOWN",
+      consensus_data: { leader_receipt: [{ execution_result: "SUCCESS" }] },
+    }],
+    ["leader error despite transaction return", {
+      txExecutionResultName: "FINISHED_WITH_RETURN",
+      consensus_data: { leader_receipt: [{ execution_result: "ERROR" }] },
+    }],
+    ["majority alone without execution evidence", { resultName: "MAJORITY_AGREE" }],
+    ["historical numeric majority alone", { result: 6 }],
+  ])("rejects a submitted write with %s", async (_label, evidence) => {
+    client.waitForTransactionReceipt.mockResolvedValueOnce({ ...parent, statusName: "FINALIZED", ...evidence });
+    const adapter = new FirstFault(contractAddress, "0x0000000000000000000000000000000000000009");
+
+    await expect(adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1"))
+      .rejects.toThrow("without successful execution evidence");
+  });
+
+  it("accepts a submitted write with leader success and no transaction execution field", async () => {
+    client.waitForTransactionReceipt.mockResolvedValueOnce({
+      ...parent, statusName: "FINALIZED",
+      consensus_data: { leader_receipt: [{ execution_result: "SUCCESS" }] },
+    });
+    const adapter = new FirstFault(contractAddress, "0x0000000000000000000000000000000000000009");
+
+    await expect(adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1"))
+      .resolves.toMatchObject({ statusName: "FINALIZED" });
   });
 });

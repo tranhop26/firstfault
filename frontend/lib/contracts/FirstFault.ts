@@ -192,14 +192,10 @@ function fundingExpirySimulationParams(error: unknown): UnknownRecord | undefine
 }
 
 function studioFeeInteger(value: unknown): bigint {
-  if (typeof value === "bigint") return value;
-  if (typeof value === "number" && Number.isSafeInteger(value)) return BigInt(value);
-  if (typeof value === "string") {
-    try {
-      return BigInt(value);
-    } catch {
-      // Fall through to the shared malformed-preset error.
-    }
+  if (typeof value === "bigint" && value >= 0n) return value;
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
+  if (typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value)) {
+    return BigInt(value);
   }
   throw new Error("Studio fee simulation returned no valid recommended preset");
 }
@@ -249,11 +245,23 @@ function parseContractJson<T>(value: unknown): T {
   return JSON.parse(value) as T;
 }
 
-function executionSucceeded(receipt: GenLayerTransaction): boolean {
-  if (receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN) return true;
+function hasAffirmativeExecutionEvidence(receipt: GenLayerTransaction): boolean {
+  const transactionExecution = receipt.txExecutionResultName as string | undefined;
   const leaderExecution = receipt.consensus_data?.leader_receipt?.[0]?.execution_result;
-  if (leaderExecution) return leaderExecution === "SUCCESS";
-  if (receipt.txExecutionResultName) return false;
+  // Studio Next's SUCCESS name is compatible with a successful leader receipt.
+  if (transactionExecution !== undefined
+    && transactionExecution !== ExecutionResult.FINISHED_WITH_RETURN
+    && transactionExecution !== "SUCCESS") return false;
+  if (leaderExecution !== undefined && leaderExecution !== "SUCCESS") return false;
+  return transactionExecution === ExecutionResult.FINISHED_WITH_RETURN || leaderExecution === "SUCCESS";
+}
+
+function readbackExecutionSucceeded(receipt: GenLayerTransaction): boolean {
+  if (receipt.txExecutionResultName !== undefined
+    || receipt.consensus_data?.leader_receipt?.[0]?.execution_result !== undefined) {
+    return hasAffirmativeExecutionEvidence(receipt);
+  }
+  // Majority-only compatibility is restricted to historical reconciliation.
   return receipt.statusName === TransactionStatus.FINALIZED
     && (
       receipt.resultName === TransactionResult.MAJORITY_AGREE
@@ -265,7 +273,7 @@ function executionSucceeded(receipt: GenLayerTransaction): boolean {
 function submittedWriteSucceeded(receipt: GenLayerTransaction): boolean {
   const decided = receipt.statusName === TransactionStatus.ACCEPTED
     || receipt.statusName === TransactionStatus.FINALIZED;
-  return decided && executionSucceeded(receipt);
+  return decided && hasAffirmativeExecutionEvidence(receipt);
 }
 
 /** Headless FirstFault contract boundary shared by browser code and Localnet tests. */
@@ -617,7 +625,7 @@ export default class FirstFault {
       const parent = await this.client.getTransaction({ hash: item.hash });
       const readable = String((parent.data?.calldata as { readable?: string } | undefined)?.readable ?? "");
       if (!matchesSettlementCall(readable, workflowId, methods)) continue;
-      if (!executionSucceeded(parent)) continue;
+      if (!readbackExecutionSucceeded(parent)) continue;
       const children = await this.getTriggeredReceiptsByHash(item.hash);
       const actual = new Map<string, bigint>();
       for (const child of children) addActual(actual, String(child.to_address ?? ""), BigInt(child.value ?? 0));
