@@ -145,6 +145,104 @@ describe("FirstFault triggered transfer finality", () => {
     });
   });
 
+  it("retries the known funding expiry simulation", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-16T15:29:22.506Z"));
+    try {
+      const account = "0x0000000000000000000000000000000000000009" as Address;
+      const originalParams = { type: "write", to: contractAddress, from: account, data: "0x1234" };
+      const expirySimulationError = {
+        cause: {
+          data: {
+            params: originalParams,
+            receipt: { result: "AUludmFsaWQgZnVuZGluZyBpbnRlbnQgZXhwaXJ5" },
+          },
+        },
+      };
+      client.estimateTransactionFeesForWrite.mockRejectedValueOnce(expirySimulationError);
+      client.request.mockResolvedValueOnce({
+        receipt: {
+          execution_result: "SUCCESS",
+          genvm_result: {
+            fee_accounting: {
+              recommended_fee_preset: {
+                distribution: {
+                  leaderTimeunitsAllocation: 100,
+                  validatorTimeunitsAllocation: 200,
+                  appealRounds: 0,
+                  executionBudgetPerRound: 153459600000000,
+                  executionConsumed: 0,
+                  totalMessageFees: 0,
+                  rotations: [3],
+                  maxPriceGenPerTimeUnit: 2,
+                  storageFeeMaxGasPrice: 300000000,
+                  receiptFeeMaxGasPrice: 300000000,
+                },
+                feeValue: 613838400010352,
+                messageAllocations: [],
+              },
+            },
+          },
+        },
+      });
+      const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3");
+
+      await adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1").catch(() => undefined);
+
+      expect(client.request).toHaveBeenCalledWith({
+        method: "sim_estimateTransactionFees",
+        params: [{
+          ...originalParams,
+          sim_config: { genvm_datetime: "2026-09-16T15:29:22.506Z" },
+        }],
+      });
+      expect(client.writeContract).toHaveBeenCalledWith(expect.objectContaining({
+        fees: expect.objectContaining({
+          feeValue: 613838400010352n,
+          distribution: expect.objectContaining({
+            executionBudgetPerRound: 153459600000000n,
+            rotations: [3n],
+          }),
+        }),
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("propagates unrelated fee simulation errors without retrying or writing", async () => {
+    const account = "0x0000000000000000000000000000000000000009" as Address;
+    const error = new Error("Buyer only");
+    client.estimateTransactionFeesForWrite.mockRejectedValueOnce(error);
+    const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3");
+
+    await expect(adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1"))
+      .rejects.toBe(error);
+
+    expect(client.request).not.toHaveBeenCalled();
+    expect(client.writeContract).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the expiry retry has no recommended preset", async () => {
+    const account = "0x0000000000000000000000000000000000000009" as Address;
+    const originalParams = { type: "write", to: contractAddress, from: account, data: "0x1234" };
+    client.estimateTransactionFeesForWrite.mockRejectedValueOnce({
+      cause: {
+        data: {
+          params: originalParams,
+          receipt: { result: "AUludmFsaWQgZnVuZGluZyBpbnRlbnQgZXhwaXJ5" },
+        },
+      },
+    });
+    client.request.mockResolvedValueOnce({ receipt: { execution_result: "SUCCESS" } });
+    const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3");
+
+    await expect(adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1"))
+      .rejects.toThrow("Studio fee simulation returned no valid recommended preset");
+
+    expect(client.writeContract).not.toHaveBeenCalled();
+  });
+
   it("does not ask the wallet to sign when fee approval is cancelled", async () => {
     const account = "0x0000000000000000000000000000000000000009" as Address;
     const confirmFee = vi.fn(async () => {

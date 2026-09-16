@@ -159,6 +159,84 @@ export type FirstFaultFeeQuote = {
 };
 
 type ContractAccount = Account | Address;
+type UnknownRecord = Record<string, unknown>;
+type WriteFeeEstimate = {
+  distribution: FeesDistribution;
+  feeValue: bigint;
+  messageAllocations?: MessageFeeAllocationInput[];
+};
+
+function asRecord(value: unknown): UnknownRecord | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as UnknownRecord
+    : undefined;
+}
+
+function decodeStudioContractResult(result: unknown): string | undefined {
+  if (typeof result !== "string") return undefined;
+  try {
+    const bytes = Uint8Array.from(atob(result), (character) => character.charCodeAt(0));
+    if (bytes.length === 0) return undefined;
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes.slice(1));
+  } catch {
+    return undefined;
+  }
+}
+
+function fundingExpirySimulationParams(error: unknown): UnknownRecord | undefined {
+  const cause = asRecord(asRecord(error)?.cause);
+  const data = asRecord(cause?.data);
+  const receipt = asRecord(data?.receipt);
+  if (decodeStudioContractResult(receipt?.result) !== "Invalid funding intent expiry") return undefined;
+  return asRecord(data?.params);
+}
+
+function studioFeeInteger(value: unknown): bigint {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number" && Number.isSafeInteger(value)) return BigInt(value);
+  if (typeof value === "string") {
+    try {
+      return BigInt(value);
+    } catch {
+      // Fall through to the shared malformed-preset error.
+    }
+  }
+  throw new Error("Studio fee simulation returned no valid recommended preset");
+}
+
+function normalizeStudioRecommendedPreset(result: unknown): WriteFeeEstimate {
+  const resultRecord = asRecord(result);
+  const receipt = asRecord(resultRecord?.receipt ?? resultRecord);
+  const preset = asRecord(asRecord(asRecord(receipt?.genvm_result)?.fee_accounting)?.recommended_fee_preset);
+  const distribution = asRecord(preset?.distribution);
+  if (!preset || !distribution) {
+    throw new Error("Studio fee simulation returned no valid recommended preset");
+  }
+  const messageAllocations = preset.messageAllocations;
+  if (messageAllocations !== undefined && !Array.isArray(messageAllocations)) {
+    throw new Error("Studio fee simulation returned no valid recommended preset");
+  }
+  return {
+    distribution: {
+      leaderTimeunitsAllocation: studioFeeInteger(distribution.leaderTimeunitsAllocation),
+      validatorTimeunitsAllocation: studioFeeInteger(distribution.validatorTimeunitsAllocation),
+      appealRounds: studioFeeInteger(distribution.appealRounds),
+      executionBudgetPerRound: studioFeeInteger(distribution.executionBudgetPerRound),
+      executionConsumed: studioFeeInteger(distribution.executionConsumed),
+      totalMessageFees: studioFeeInteger(distribution.totalMessageFees),
+      rotations: Array.isArray(distribution.rotations)
+        ? distribution.rotations.map(studioFeeInteger)
+        : (() => { throw new Error("Studio fee simulation returned no valid recommended preset"); })(),
+      maxPriceGenPerTimeUnit: studioFeeInteger(distribution.maxPriceGenPerTimeUnit),
+      storageFeeMaxGasPrice: studioFeeInteger(distribution.storageFeeMaxGasPrice),
+      receiptFeeMaxGasPrice: studioFeeInteger(distribution.receiptFeeMaxGasPrice),
+    },
+    feeValue: studioFeeInteger(preset.feeValue),
+    ...(messageAllocations !== undefined
+      ? { messageAllocations: messageAllocations as MessageFeeAllocationInput[] }
+      : {}),
+  };
+}
 
 function asContractAddress(address: Address): CalldataAddress {
   return new CalldataAddress(hexToBytes(address));
@@ -223,6 +301,28 @@ export default class FirstFault {
     this.client = this.makeClient(account);
   }
 
+  private async estimateWriteFees(
+    request: Parameters<ReturnType<typeof createClient>["estimateTransactionFeesForWrite"]>[0],
+  ): Promise<WriteFeeEstimate> {
+    try {
+      return await this.client.estimateTransactionFeesForWrite(request);
+    } catch (error) {
+      if (request.functionName !== "prepare_funding") throw error;
+      const params = fundingExpirySimulationParams(error);
+      if (!params) throw error;
+      const result = await (this.client as unknown as {
+        request(args: { method: string; params: [UnknownRecord] }): Promise<unknown>;
+      }).request({
+        method: "sim_estimateTransactionFees",
+        params: [{
+          ...params,
+          sim_config: { genvm_datetime: new Date().toISOString() },
+        }],
+      });
+      return normalizeStudioRecommendedPreset(result);
+    }
+  }
+
   private async write(functionName: string, args: unknown[], value = 0n) {
     if (!this.account) throw new Error("A connected account is required");
     const request = {
@@ -233,7 +333,7 @@ export default class FirstFault {
     };
     const estimate = this.endpoint
       ? undefined
-      : await this.client.estimateTransactionFeesForWrite(request);
+      : await this.estimateWriteFees(request);
     if (estimate && this.confirmFee) {
       const accountAddress = typeof this.account === "string" ? this.account : this.account.address;
       await this.confirmFee({
