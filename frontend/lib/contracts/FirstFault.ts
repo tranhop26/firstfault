@@ -250,11 +250,10 @@ function parseContractJson<T>(value: unknown): T {
 }
 
 function executionSucceeded(receipt: GenLayerTransaction): boolean {
-  if (receipt.txExecutionResultName) {
-    return receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN;
-  }
+  if (receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN) return true;
   const leaderExecution = receipt.consensus_data?.leader_receipt?.[0]?.execution_result;
   if (leaderExecution) return leaderExecution === "SUCCESS";
+  if (receipt.txExecutionResultName) return false;
   return receipt.statusName === TransactionStatus.FINALIZED
     && (
       receipt.resultName === TransactionResult.MAJORITY_AGREE
@@ -266,8 +265,7 @@ function executionSucceeded(receipt: GenLayerTransaction): boolean {
 function submittedWriteSucceeded(receipt: GenLayerTransaction): boolean {
   const decided = receipt.statusName === TransactionStatus.ACCEPTED
     || receipt.statusName === TransactionStatus.FINALIZED;
-  return decided
-    && receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN;
+  return decided && executionSucceeded(receipt);
 }
 
 /** Headless FirstFault contract boundary shared by browser code and Localnet tests. */
@@ -368,7 +366,7 @@ export default class FirstFault {
       retries: this.endpoint ? 600 : 120,
     });
     if (!submittedWriteSucceeded(receipt)) {
-      throw new Error(`FirstFault ${functionName} reached a decision without FINISHED_WITH_RETURN`);
+      throw new Error(`FirstFault ${functionName} reached a decision without successful execution evidence`);
     }
     return receipt;
   }

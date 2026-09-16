@@ -563,6 +563,20 @@ describe("FirstFault triggered transfer finality", () => {
     });
   });
 
+  it("accepts a finalized Studio Next write with SUCCESS execution evidence", async () => {
+    const account = "0x0000000000000000000000000000000000000009" as Address;
+    client.waitForTransactionReceipt.mockResolvedValueOnce({
+      ...parent,
+      statusName: "FINALIZED",
+      txExecutionResultName: "SUCCESS",
+      consensus_data: { leader_receipt: [{ execution_result: "SUCCESS" }] },
+    });
+    const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3");
+
+    await expect(adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1"))
+      .resolves.toMatchObject({ statusName: "FINALIZED" });
+  });
+
   it("rejects FINALIZED when GenVM execution failed", async () => {
     const account = "0x0000000000000000000000000000000000000009" as Address;
     client.waitForTransactionReceipt.mockResolvedValue({
@@ -573,6 +587,6 @@ describe("FirstFault triggered transfer finality", () => {
     const adapter = new FirstFault(contractAddress, account, undefined, undefined, "v3");
 
     await expect(adapter.prepareFunding("v3-demo", "intent-1", 2000n, "prepare-1"))
-      .rejects.toThrow("without FINISHED_WITH_RETURN");
+      .rejects.toThrow("without successful execution evidence");
   });
 });
