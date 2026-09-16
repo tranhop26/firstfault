@@ -67,6 +67,7 @@ function classifyLegacy(provider: Eip1193Provider): WalletId | null {
 export function createWalletProviderRegistry(target: ProviderEventTarget): WalletProviderRegistry {
   const records = new Map<WalletId, WalletProviderRecord>();
   const announcementIds = new Set<string>();
+  const disqualifiedLegacyProviders = new WeakSet<Eip1193Provider>();
   const listeners = new Set<(wallets: WalletProviderRecord[]) => void>();
   let started = false;
 
@@ -90,7 +91,20 @@ export function createWalletProviderRegistry(target: ProviderEventTarget): Walle
     if (!detail?.info || !detail.provider || announcementIds.has(detail.info.uuid)) return;
     announcementIds.add(detail.info.uuid);
     const id = classifyAnnouncement(detail.info, detail.provider);
-    if (id) add(id, detail.provider, detail.info);
+    if (id) {
+      add(id, detail.provider, detail.info);
+      return;
+    }
+
+    disqualifiedLegacyProviders.add(detail.provider);
+    let removed = false;
+    for (const [recordId, record] of records) {
+      if (record.provider === detail.provider && !record.info) {
+        records.delete(recordId);
+        removed = true;
+      }
+    }
+    if (removed) notify();
   };
 
   const addLegacyProviders = () => {
@@ -101,6 +115,7 @@ export function createWalletProviderRegistry(target: ProviderEventTarget): Walle
       ...(target.okxwallet ? [target.okxwallet] : []),
     ];
     for (const provider of candidates) {
+      if (disqualifiedLegacyProviders.has(provider)) continue;
       const id = classifyLegacy(provider);
       if (id && !records.has(id)) add(id, provider);
     }

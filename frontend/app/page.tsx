@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AgentTankBadge, AgentTankEntryLabel } from "@/components/AgentTankBadge";
 import { WorkflowComposer } from "@/components/firstfault/WorkflowComposer";
 import { WorkflowTimeline } from "@/components/firstfault/WorkflowTimeline";
@@ -26,6 +26,7 @@ export default function HomePage() {
   const [rejection, setRejection] = useState("");
   const [nowSeconds, setNowSeconds] = useState(0);
   const [walletChooserOpen, setWalletChooserOpen] = useState(false);
+  const walletControlRef = useRef<HTMLButtonElement>(null);
   const app = useFirstFault(workflowId);
   const writable = canWrite({ connected: app.wallet.isConnected, correctNetwork: app.wallet.isOnCorrectNetwork, configured: app.configured }) && !app.actionPending;
   const isBuyer = Boolean(app.workflow && app.wallet.address?.toLowerCase() === app.workflow.buyer.toLowerCase());
@@ -38,6 +39,9 @@ export default function HomePage() {
     const timer = window.setInterval(() => setNowSeconds(Math.floor(Date.now() / 1000)), 1_000);
     return () => window.clearInterval(timer);
   }, []);
+  useEffect(() => {
+    if (!walletChooserOpen && app.wallet.isConnected) walletControlRef.current?.focus();
+  }, [app.wallet.isConnected, walletChooserOpen]);
   const workerDeadlineExpired = app.steps.some((step) => step.state === "PENDING" && nowSeconds > Number(step.deadline));
   const reviewDeadlineExpired = Boolean(app.workflow?.review_deadline && nowSeconds > Number(app.workflow.review_deadline));
   const retryReady = Boolean(app.workflow?.round_opened_at && nowSeconds > Number(app.workflow.round_opened_at) + 3_600);
@@ -58,7 +62,7 @@ export default function HomePage() {
           <div className="ff-brand-cluster"><a className="ff-logo" href="#"><span className="ff-logo-mark">F</span><span>FirstFault<small>verifiable agent settlement</small></span></a><AgentTankBadge /></div>
           <form className="ff-search" onSubmit={(event) => { event.preventDefault(); setWorkflowId(search.trim()); }}><input aria-label="Workflow ID" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by exact workflow ID" /><button>Inspect case</button></form>
           <div className="ff-wallet">
-            {app.wallet.isConnected ? <><span title={app.wallet.address ?? ""}>{app.wallet.walletName} · {short(app.wallet.address ?? "")}</span><button onClick={app.wallet.disconnectWallet}>Disconnect</button></> : <button className="ff-connect" onClick={() => setWalletChooserOpen(true)}>Connect wallet</button>}
+            {app.wallet.isConnected ? <><span title={app.wallet.address ?? ""}>{app.wallet.walletName} · {short(app.wallet.address ?? "")}</span><button ref={walletControlRef} onClick={app.wallet.disconnectWallet}>Disconnect</button></> : <button ref={walletControlRef} className="ff-connect" onClick={() => setWalletChooserOpen(true)}>Connect wallet</button>}
           </div>
         </div></div>
         <CaseSubnav contractVersion={app.contractVersion} hasWorkflow={Boolean(app.workflow)} recoveryAvailable={app.workflow?.state === "UNRESOLVED"} />
@@ -66,7 +70,10 @@ export default function HomePage() {
 
       <WalletChooserDialog
         open={walletChooserOpen}
-        onOpenChange={setWalletChooserOpen}
+        onOpenChange={(open) => {
+          if (!open && app.wallet.pendingWalletId) app.wallet.disconnectWallet();
+          setWalletChooserOpen(open);
+        }}
         wallets={app.wallet.availableWallets}
         pendingWalletId={app.wallet.pendingWalletId}
         onSelect={async (walletId) => {

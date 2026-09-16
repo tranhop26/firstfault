@@ -15,7 +15,6 @@ import {
   GENLAYER_CHAIN_ID,
   getAccounts,
   getCurrentChainId,
-  isOnGenLayerNetwork,
   switchAccount,
 } from "./client";
 import {
@@ -135,6 +134,16 @@ export function WalletProvider({
   );
   const [state, setState] = useState<WalletState>(initialState);
   const activeProviderRef = useRef<Eip1193Provider | null>(null);
+  const sessionGenerationRef = useRef(0);
+  const operationGenerationRef = useRef(0);
+  const eventSequenceRef = useRef(0);
+
+  useEffect(() => () => {
+    sessionGenerationRef.current += 1;
+    operationGenerationRef.current += 1;
+    eventSequenceRef.current += 1;
+    activeProviderRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (!activeRegistry) {
@@ -160,22 +169,58 @@ export function WalletProvider({
   useEffect(() => {
     const provider = state.provider;
     if (!provider) return;
+    const sessionGeneration = sessionGenerationRef.current;
+
+    const isCurrentEvent = (eventSequence: number) => (
+      activeProviderRef.current === provider
+      && sessionGenerationRef.current === sessionGeneration
+      && eventSequenceRef.current === eventSequence
+    );
+
+    const resetSession = () => {
+      sessionGenerationRef.current += 1;
+      operationGenerationRef.current += 1;
+      eventSequenceRef.current += 1;
+      activeProviderRef.current = null;
+      setState((previous) => ({
+        ...previous,
+        address: null,
+        chainId: null,
+        isConnected: false,
+        isLoading: false,
+        isOnCorrectNetwork: false,
+        walletId: null,
+        walletName: null,
+        provider: null,
+        pendingWalletId: null,
+      }));
+    };
 
     const handleAccountsChanged = async (accounts: string[]) => {
+      const eventSequence = ++eventSequenceRef.current;
+      if (accounts.length === 0) {
+        if (isCurrentEvent(eventSequence)) resetSession();
+        return;
+      }
       const chainId = await getCurrentChainId(provider);
-      const correctNetwork = await isOnGenLayerNetwork(provider);
-      if (activeProviderRef.current !== provider) return;
+      if (!isCurrentEvent(eventSequence)) return;
       setState((previous) => ({
         ...previous,
         address: accounts[0] || null,
         chainId,
         isConnected: accounts.length > 0,
-        isOnCorrectNetwork: correctNetwork,
+        isOnCorrectNetwork: chainId !== null
+          && Number.parseInt(chainId, 16) === GENLAYER_CHAIN_ID,
       }));
     };
     const handleChainChanged = async (chainId: string) => {
+      const eventSequence = ++eventSequenceRef.current;
       const accounts = await getAccounts(provider);
-      if (activeProviderRef.current !== provider) return;
+      if (!isCurrentEvent(eventSequence)) return;
+      if (accounts.length === 0) {
+        resetSession();
+        return;
+      }
       setState((previous) => ({
         ...previous,
         address: accounts[0] || null,
@@ -185,18 +230,11 @@ export function WalletProvider({
       }));
     };
     const handleDisconnect = () => {
-      activeProviderRef.current = null;
-      setState((previous) => ({
-        ...previous,
-        address: null,
-        chainId: null,
-        isConnected: false,
-        isOnCorrectNetwork: false,
-        walletId: null,
-        walletName: null,
-        provider: null,
-        pendingWalletId: null,
-      }));
+      if (
+        activeProviderRef.current !== provider
+        || sessionGenerationRef.current !== sessionGeneration
+      ) return;
+      resetSession();
     };
 
     provider.on("accountsChanged", handleAccountsChanged);
@@ -224,31 +262,46 @@ export function WalletProvider({
       throw cause;
     }
 
+    const sessionGeneration = ++sessionGenerationRef.current;
+    const operationGeneration = ++operationGenerationRef.current;
+    eventSequenceRef.current += 1;
+    activeProviderRef.current = null;
+    const isCurrentOperation = () => (
+      sessionGenerationRef.current === sessionGeneration
+      && operationGenerationRef.current === operationGeneration
+    );
+
     setState((previous) => ({ ...previous, isLoading: true, pendingWalletId: walletId }));
     try {
-      const address = await withConnectionTimeout(
-        connectWalletProvider(record),
+      const connection = await withConnectionTimeout(
+        (async () => {
+          const address = await connectWalletProvider(record);
+          const chainId = await getCurrentChainId(record.provider);
+          return {
+            address,
+            chainId,
+            correctNetwork: chainId !== null
+              && Number.parseInt(chainId, 16) === GENLAYER_CHAIN_ID,
+          };
+        })(),
         connectionTimeoutMs,
         record.name,
       );
-      const chainId = await getCurrentChainId(record.provider);
-      const correctNetwork = await isOnGenLayerNetwork(record.provider);
+      if (!isCurrentOperation()) throw new Error("Wallet connection was cancelled");
       activeProviderRef.current = record.provider;
       setState((previous) => ({
         ...previous,
-        address,
-        chainId,
+        address: connection.address,
+        chainId: connection.chainId,
         isConnected: true,
-        isLoading: false,
-        isOnCorrectNetwork: correctNetwork,
+        isOnCorrectNetwork: connection.correctNetwork,
         walletId,
         walletName: record.name,
         provider: record.provider,
-        pendingWalletId: null,
       }));
-      return address;
+      return connection.address;
     } catch (cause) {
-      setState((previous) => ({ ...previous, isLoading: false, pendingWalletId: null }));
+      if (!isCurrentOperation()) throw cause;
       const code = errorCode(cause);
       const message = errorMessage(cause);
       if (code === 4001) {
@@ -261,10 +314,17 @@ export function WalletProvider({
         toastError("Failed to connect wallet", { description: message });
       }
       throw cause;
+    } finally {
+      if (isCurrentOperation()) {
+        setState((previous) => ({ ...previous, isLoading: false, pendingWalletId: null }));
+      }
     }
   }, [activeRegistry, connectionTimeoutMs]);
 
   const disconnectWallet = useCallback(() => {
+    sessionGenerationRef.current += 1;
+    operationGenerationRef.current += 1;
+    eventSequenceRef.current += 1;
     activeProviderRef.current = null;
     setState((previous) => ({
       ...previous,
@@ -282,27 +342,55 @@ export function WalletProvider({
 
   const switchWalletAccount = useCallback(async () => {
     if (!state.provider || !state.walletName) throw new Error("Connect a wallet first");
+    const provider = state.provider;
+    const walletName = state.walletName;
+    const sessionGeneration = sessionGenerationRef.current;
+    const operationGeneration = ++operationGenerationRef.current;
+    const eventSequence = ++eventSequenceRef.current;
+    const ownsOperation = () => (
+      activeProviderRef.current === provider
+      && sessionGenerationRef.current === sessionGeneration
+      && operationGenerationRef.current === operationGeneration
+    );
+
     setState((previous) => ({ ...previous, isLoading: true }));
     try {
-      const address = await switchAccount(state.provider, state.walletName);
-      const chainId = await getCurrentChainId(state.provider);
-      const correctNetwork = await isOnGenLayerNetwork(state.provider);
-      setState((previous) => ({
-        ...previous,
-        address,
-        chainId,
-        isConnected: true,
-        isLoading: false,
-        isOnCorrectNetwork: correctNetwork,
-      }));
-      return address;
+      const account = await withConnectionTimeout(
+        (async () => {
+          const address = await switchAccount(provider, walletName);
+          const chainId = await getCurrentChainId(provider);
+          return {
+            address,
+            chainId,
+            correctNetwork: chainId !== null
+              && Number.parseInt(chainId, 16) === GENLAYER_CHAIN_ID,
+          };
+        })(),
+        connectionTimeoutMs,
+        walletName,
+      );
+      if (!ownsOperation()) throw new Error("Account switch was cancelled");
+      if (eventSequenceRef.current === eventSequence) {
+        setState((previous) => ({
+          ...previous,
+          address: account.address,
+          chainId: account.chainId,
+          isConnected: true,
+          isOnCorrectNetwork: account.correctNetwork,
+        }));
+      }
+      return account.address;
     } catch (cause) {
-      setState((previous) => ({ ...previous, isLoading: false }));
+      if (!ownsOperation()) throw cause;
       if (errorCode(cause) === 4001) userRejected("Account switch cancelled");
       else toastError("Failed to switch account", { description: errorMessage(cause) });
       throw cause;
+    } finally {
+      if (ownsOperation()) {
+        setState((previous) => ({ ...previous, isLoading: false }));
+      }
     }
-  }, [state.provider, state.walletName]);
+  }, [connectionTimeoutMs, state.provider, state.walletName]);
 
   const value: WalletContextValue = {
     ...state,

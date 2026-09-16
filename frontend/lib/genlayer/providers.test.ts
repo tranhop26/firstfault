@@ -64,6 +64,23 @@ describe("wallet provider registry", () => {
     expect(registry.list()).toEqual([]);
   });
 
+  it("removes a legacy MetaMask classification when that provider announces an unsupported identity", () => {
+    const target = new FakeProviderWindow();
+    const compatibilityProvider = provider({ isMetaMask: true });
+    target.ethereum = compatibilityProvider;
+    const registry = createWalletProviderRegistry(target);
+
+    registry.start();
+    expect(registry.get("metamask")?.provider).toBe(compatibilityProvider);
+
+    target.announce(
+      info("compat-1", "Another Wallet", "com.example.another-wallet"),
+      compatibilityProvider,
+    );
+
+    expect(registry.get("metamask")).toBeUndefined();
+  });
+
   it("uses exact legacy providers and ignores an arbitrary window.ethereum", () => {
     const target = new FakeProviderWindow();
     const generic = provider();

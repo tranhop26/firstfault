@@ -23,9 +23,7 @@ export function WalletChooserDialog({
   return (
     <Dialog.Root
       open={open}
-      onOpenChange={(nextOpen) => {
-        if (nextOpen || !pendingWalletId) onOpenChange(nextOpen);
-      }}
+      onOpenChange={onOpenChange}
     >
       <Dialog.Portal>
         <Dialog.Overlay className="ff-modal-backdrop" />
@@ -36,14 +34,8 @@ export function WalletChooserDialog({
               ? document.activeElement
               : null;
           }}
-          onEscapeKeyDown={(event) => {
-            if (pendingWalletId) event.preventDefault();
-          }}
-          onPointerDownOutside={(event) => {
-            if (pendingWalletId) event.preventDefault();
-          }}
           onCloseAutoFocus={(event) => {
-            if (!openerRef.current) return;
+            if (!openerRef.current?.isConnected) return;
             event.preventDefault();
             openerRef.current.focus();
           }}
@@ -51,7 +43,6 @@ export function WalletChooserDialog({
           <Dialog.Close
             className="ff-modal-close"
             aria-label="Close wallet chooser"
-            disabled={Boolean(pendingWalletId)}
           >×</Dialog.Close>
           <span className="ff-eyebrow">Studio Next</span>
           <Dialog.Title>Choose a wallet</Dialog.Title>

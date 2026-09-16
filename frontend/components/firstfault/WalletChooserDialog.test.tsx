@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -37,11 +37,16 @@ describe("WalletChooserDialog", () => {
   });
 
   it("disables both choices while the selected wallet is connecting", () => {
-    render(<WalletChooserDialog open onOpenChange={() => undefined}
+    const onOpenChange = vi.fn();
+    render(<WalletChooserDialog open onOpenChange={onOpenChange}
       wallets={wallets} pendingWalletId="metamask" onSelect={() => undefined} />);
 
     expect((screen.getByRole("button", { name: "Connecting MetaMask" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Connect OKX Wallet" }) as HTMLButtonElement).disabled).toBe(true);
+    const close = screen.getByRole("button", { name: "Close wallet chooser" }) as HTMLButtonElement;
+    expect(close.disabled).toBe(false);
+    fireEvent.click(close);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("closes from its accessible close control", () => {
@@ -73,5 +78,40 @@ describe("WalletChooserDialog", () => {
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it("returns focus to the connected wallet control when success replaces the opener", async () => {
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      const [connected, setConnected] = useState(false);
+      const walletControlRef = useRef<HTMLButtonElement>(null);
+      useEffect(() => {
+        if (!open && connected) walletControlRef.current?.focus();
+      }, [connected, open]);
+      return <>
+        {connected
+          ? <button key="disconnect" ref={walletControlRef}>Disconnect</button>
+          : <button key="connect" ref={walletControlRef} onClick={() => setOpen(true)}>Connect wallet</button>}
+        <WalletChooserDialog
+          open={open}
+          onOpenChange={setOpen}
+          wallets={wallets}
+          pendingWalletId={null}
+          onSelect={() => {
+            setConnected(true);
+            setOpen(false);
+          }}
+        />
+      </>;
+    }
+
+    render(<Harness />);
+    const opener = screen.getByRole("button", { name: "Connect wallet" });
+    fireEvent.click(opener);
+    fireEvent.click(await screen.findByRole("button", { name: "Connect OKX Wallet" }));
+
+    const disconnect = await screen.findByRole("button", { name: "Disconnect" });
+    await waitFor(() => expect(opener.isConnected).toBe(false));
+    await waitFor(() => expect(document.activeElement).toBe(disconnect));
   });
 });

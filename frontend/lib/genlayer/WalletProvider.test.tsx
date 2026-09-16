@@ -11,6 +11,7 @@ import type {
 
 const ADDRESS = "0x21b45103dd05c43969daF3CbB4277391777e2eC7";
 const NEXT_ADDRESS = "0x35C9979d30992b13EF6dF7036bC745E2e1cD76a2";
+const OLD_EVENT_ADDRESS = "0x76D4D79c9cA9A96C8F5470F231FE65E9954Fd9d8";
 
 afterEach(() => {
   cleanup();
@@ -57,6 +58,7 @@ function WalletProbe() {
     <span data-testid="address">{wallet.address ?? "none"}</span>
     <span data-testid="loading">{String(wallet.isLoading)}</span>
     <button onClick={() => void wallet.connectWallet("okx").catch(() => undefined)}>connect-okx</button>
+    <button onClick={() => void wallet.switchWalletAccount().catch(() => undefined)}>switch-account</button>
     <button onClick={wallet.disconnectWallet}>disconnect</button>
   </>;
 }
@@ -112,6 +114,52 @@ describe("WalletProvider selected provider session", () => {
     expect(screen.getByTestId("wallet-name").textContent).toBe("none");
   });
 
+  it("times out when a final chain read hangs after the wallet connection succeeds", async () => {
+    let chainReads = 0;
+    const okx = new EventProvider(async ({ method }) => {
+      if (method === "eth_requestAccounts" || method === "eth_accounts") return [ADDRESS];
+      if (method === "eth_chainId") {
+        chainReads += 1;
+        if (chainReads >= 3) return new Promise(() => undefined);
+        return "0xf22d";
+      }
+      return null;
+    });
+    render(<WalletProvider
+      registry={registry({ id: "okx", name: "OKX Wallet", provider: okx })}
+      connectionTimeoutMs={20}
+    >
+      <WalletProbe />
+    </WalletProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+
+    await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
+    expect(screen.getByTestId("wallet-name").textContent).toBe("none");
+  });
+
+  it("does not repopulate state when a pending connection finishes after disconnect", async () => {
+    let releaseAccounts: ((accounts: string[]) => void) | undefined;
+    const okx = new EventProvider(async ({ method }) => {
+      if (method === "eth_requestAccounts") {
+        return new Promise<string[]>((resolve) => { releaseAccounts = resolve; });
+      }
+      if (method === "eth_accounts") return [ADDRESS];
+      if (method === "eth_chainId") return "0xf22d";
+      return null;
+    });
+    render(<WalletProvider registry={registry({ id: "okx", name: "OKX Wallet", provider: okx })}>
+      <WalletProbe />
+    </WalletProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+    await waitFor(() => expect(releaseAccounts).toBeTypeOf("function"));
+    fireEvent.click(screen.getByRole("button", { name: "disconnect" }));
+    await act(async () => releaseAccounts?.([ADDRESS]));
+
+    expect(screen.getByTestId("wallet-name").textContent).toBe("none");
+    expect(screen.getByTestId("address").textContent).toBe("none");
+    expect(screen.getByTestId("loading").textContent).toBe("false");
+  });
+
   it("updates from the active provider and clears the session on disconnect", async () => {
     const okx = new EventProvider(async ({ method }) => {
       if (method === "eth_requestAccounts" || method === "eth_accounts") return [ADDRESS];
@@ -162,5 +210,160 @@ describe("WalletProvider selected provider session", () => {
 
     expect(screen.getByTestId("wallet-name").textContent).toBe("none");
     expect(screen.getByTestId("address").textContent).toBe("none");
+  });
+
+  it("ignores an old event after disconnecting and reconnecting the same provider", async () => {
+    let selectedAddress = ADDRESS;
+    let delayChainRead = false;
+    let releaseChainRead: (() => void) | undefined;
+    const okx = new EventProvider(async ({ method }) => {
+      if (method === "eth_requestAccounts" || method === "eth_accounts") return [selectedAddress];
+      if (method === "eth_chainId" && delayChainRead) {
+        delayChainRead = false;
+        return new Promise<string>((resolve) => {
+          releaseChainRead = () => {
+            resolve("0xf22d");
+          };
+        });
+      }
+      if (method === "eth_chainId") return "0xf22d";
+      return null;
+    });
+    render(<WalletProvider registry={registry({ id: "okx", name: "OKX Wallet", provider: okx })}>
+      <WalletProbe />
+    </WalletProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(ADDRESS));
+
+    delayChainRead = true;
+    okx.emit("accountsChanged", [OLD_EVENT_ADDRESS]);
+    await waitFor(() => expect(releaseChainRead).toBeTypeOf("function"));
+    fireEvent.click(screen.getByRole("button", { name: "disconnect" }));
+    selectedAddress = NEXT_ADDRESS;
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(NEXT_ADDRESS));
+    await act(async () => releaseChainRead?.());
+
+    expect(screen.getByTestId("address").textContent).toBe(NEXT_ADDRESS);
+  });
+
+  it("installs a fresh event session after an empty account event and reconnect", async () => {
+    const okx = new EventProvider(async ({ method }) => {
+      if (method === "eth_requestAccounts" || method === "eth_accounts") return [ADDRESS];
+      if (method === "eth_chainId") return "0xf22d";
+      return null;
+    });
+    render(<WalletProvider registry={registry({ id: "okx", name: "OKX Wallet", provider: okx })}>
+      <WalletProbe />
+    </WalletProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(ADDRESS));
+
+    okx.emit("accountsChanged", []);
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe("none"));
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(ADDRESS));
+    okx.emit("accountsChanged", [NEXT_ADDRESS]);
+
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(NEXT_ADDRESS));
+  });
+
+  it("installs a fresh event session after a chain event finds no accounts", async () => {
+    let accountsForRead = [ADDRESS];
+    const okx = new EventProvider(async ({ method }) => {
+      if (method === "eth_requestAccounts") return [ADDRESS];
+      if (method === "eth_accounts") return accountsForRead;
+      if (method === "eth_chainId") return "0xf22d";
+      return null;
+    });
+    render(<WalletProvider registry={registry({ id: "okx", name: "OKX Wallet", provider: okx })}>
+      <WalletProbe />
+    </WalletProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(ADDRESS));
+
+    accountsForRead = [];
+    okx.emit("chainChanged", "0xf22d");
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe("none"));
+    accountsForRead = [ADDRESS];
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(ADDRESS));
+    okx.emit("accountsChanged", [NEXT_ADDRESS]);
+
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(NEXT_ADDRESS));
+  });
+
+  it("bounds account switching and clears loading when the wallet hangs", async () => {
+    const okx = new EventProvider(async ({ method }) => {
+      if (method === "eth_requestAccounts" || method === "eth_accounts") return [ADDRESS];
+      if (method === "eth_chainId") return "0xf22d";
+      if (method === "wallet_requestPermissions") return new Promise(() => undefined);
+      return null;
+    });
+    render(<WalletProvider
+      registry={registry({ id: "okx", name: "OKX Wallet", provider: okx })}
+      connectionTimeoutMs={20}
+    >
+      <WalletProbe />
+    </WalletProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(ADDRESS));
+    fireEvent.click(screen.getByRole("button", { name: "switch-account" }));
+
+    await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
+    expect(screen.getByTestId("address").textContent).toBe(ADDRESS);
+  });
+
+  it("clears loading when the provider disconnects during an account switch", async () => {
+    const okx = new EventProvider(async ({ method }) => {
+      if (method === "eth_requestAccounts" || method === "eth_accounts") return [ADDRESS];
+      if (method === "eth_chainId") return "0xf22d";
+      if (method === "wallet_requestPermissions") return new Promise(() => undefined);
+      return null;
+    });
+    render(<WalletProvider
+      registry={registry({ id: "okx", name: "OKX Wallet", provider: okx })}
+      connectionTimeoutMs={20}
+    >
+      <WalletProbe />
+    </WalletProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(ADDRESS));
+    fireEvent.click(screen.getByRole("button", { name: "switch-account" }));
+    await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("true"));
+    okx.emit("disconnect");
+
+    await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
+    expect(screen.getByTestId("wallet-name").textContent).toBe("none");
+    expect(screen.getByTestId("address").textContent).toBe("none");
+  });
+
+  it("keeps a newer account event when an older account-switch operation finishes later", async () => {
+    let switching = false;
+    let releasePermissions: (() => void) | undefined;
+    const okx = new EventProvider(async ({ method }) => {
+      if (method === "eth_requestAccounts") return [ADDRESS];
+      if (method === "eth_accounts") return [ADDRESS];
+      if (method === "eth_chainId") return "0xf22d";
+      if (method === "wallet_requestPermissions" && switching) {
+        return new Promise((resolve) => { releasePermissions = () => resolve([]); });
+      }
+      return null;
+    });
+    render(<WalletProvider registry={registry({ id: "okx", name: "OKX Wallet", provider: okx })}>
+      <WalletProbe />
+    </WalletProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "connect-okx" }));
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(ADDRESS));
+
+    switching = true;
+    fireEvent.click(screen.getByRole("button", { name: "switch-account" }));
+    await waitFor(() => expect(releasePermissions).toBeTypeOf("function"));
+    okx.emit("accountsChanged", [NEXT_ADDRESS]);
+    await waitFor(() => expect(screen.getByTestId("address").textContent).toBe(NEXT_ADDRESS));
+    await act(async () => releasePermissions?.());
+
+    expect(screen.getByTestId("address").textContent).toBe(NEXT_ADDRESS);
+    expect(screen.getByTestId("loading").textContent).toBe("false");
   });
 });
