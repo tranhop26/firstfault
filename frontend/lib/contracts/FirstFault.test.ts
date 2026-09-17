@@ -563,6 +563,61 @@ describe("FirstFault triggered transfer finality", () => {
     expect(client.request).toHaveBeenCalledWith({ method: "sim_getTransactionsForAddress", params: [contractAddress] });
   });
 
+  it("reconstructs settlement proof from current Studio Next acceptance calldata", async () => {
+    const workflowId = "studio-next-live-42";
+    const researcher = "0x0000000000000000000000000000000000000002";
+    client.request.mockResolvedValue([{ hash: parent.hash, to_address: contractAddress, type: 2, status: "FINALIZED" }]);
+    client.getTransaction.mockResolvedValueOnce({
+      ...parent,
+      statusName: "FINALIZED",
+      txExecutionResultName: "FINISHED_WITH_RETURN",
+      data: {
+        calldata: {
+          readable: `{"":"accept_workflow""args":["${workflowId}","accept-live-nonce",]}`,
+        },
+      },
+    }).mockResolvedValueOnce({
+      hash: childHash,
+      statusName: "FINALIZED",
+      type: 0,
+      consensus_data: null,
+      triggered_by: parent.hash,
+      from_address: contractAddress,
+      origin_address: contractAddress,
+      to_address: researcher,
+      value: 11n,
+    });
+    mockSinglePayoutWorkflow(workflowId, researcher);
+
+    const adapter = new FirstFault(contractAddress);
+    const proof = await adapter.findSettlementEvidence(workflowId);
+
+    expect(proof?.parent.hash).toBe(parent.hash);
+    expect(proof?.children).toHaveLength(1);
+  });
+
+  it("rejects current Studio Next calldata whose exact first workflow argument differs", async () => {
+    const workflowId = "target-studio-next-42";
+    const researcher = "0x0000000000000000000000000000000000000002";
+    client.request.mockResolvedValue([{ hash: parent.hash, to_address: contractAddress, type: 2, status: "FINALIZED" }]);
+    client.getTransaction.mockResolvedValue({
+      ...parent,
+      statusName: "FINALIZED",
+      txExecutionResultName: "FINISHED_WITH_RETURN",
+      data: {
+        calldata: {
+          readable: `{"":"accept_workflow""args":["another-workflow","${workflowId}",]}`,
+        },
+      },
+    });
+    mockSinglePayoutWorkflow(workflowId, researcher);
+
+    const adapter = new FirstFault(contractAddress);
+
+    await expect(adapter.findSettlementEvidence(workflowId)).resolves.toBeNull();
+    expect(client.getTriggeredTransactionIds).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["numeric", { result: 6 }],
     ["named", { resultName: "MAJORITY_AGREE" }],

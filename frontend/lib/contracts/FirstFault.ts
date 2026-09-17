@@ -664,6 +664,17 @@ function matchesSettlementCall(readable: string, workflowId: string, methods: re
       && Array.isArray(call.args)
       && call.args[0] === workflowId;
   } catch {
+    // Studio Next currently exposes the method as an unnamed leading field
+    // followed by the arguments, without a separating comma.
+    const currentMethod = readable.match(/^\{"":"([^"]+)""args":\[/);
+    const currentFirstArgument = readable.match(/^\{"":"[^"]+""args":\["((?:\\.|[^"\\])*)"/);
+    if (currentMethod && currentFirstArgument && methods.includes(currentMethod[1])) {
+      try {
+        return JSON.parse(`"${currentFirstArgument[1]}"`) === workflowId;
+      } catch {
+        return false;
+      }
+    }
     // Studionet currently exposes GenLayer calldata as JSON-like text with a
     // trailing comma and no comma before "method". Parse only the exact first
     // argument and terminal method fields instead of using substring matches.
