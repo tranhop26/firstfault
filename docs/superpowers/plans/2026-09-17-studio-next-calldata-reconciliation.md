@@ -4,7 +4,7 @@
 
 **Goal:** Restore wallet-free settlement proof reconstruction for current Studio Next calldata so fresh browsers show the finalized parent and child payout Explorer links.
 
-**Architecture:** Keep the Intelligent Contract and all settlement checks unchanged. Extend only the exact calldata matcher to recognize the current Studio Next unnamed-method representation, then prove the behavior with an exact live-format regression test, the full frontend gates, and live-chain readback.
+**Architecture:** Keep the Intelligent Contract and all settlement checks unchanged. Extend the exact calldata matcher to recognize the current Studio Next unnamed-method representation. When the SDK returns no triggered IDs, let historical reconciliation use exact-parent child hashes from the already-fetched contract history, then run those receipts through the existing validation before the full frontend and live-chain gates.
 
 **Tech Stack:** TypeScript 5.9, Vitest 3, genlayer-js 2.0.0-rc.1, Next.js 16, Studio Next RPC.
 
@@ -13,6 +13,7 @@
 - Match an allow-listed settlement method and the exact first workflow argument.
 - Fail closed for unrelated or malformed calldata; never use a loose workflow substring match.
 - Preserve the existing contract-address, type, `FINALIZED`, execution-success, triggered-child, and exact-allocation checks.
+- Prefer non-empty SDK-triggered IDs; use history fallback only when the SDK result is empty and `triggered_by` exactly matches the selected parent.
 - Do not change Intelligent Contract, wallet, custody, fees, state machine, contract address, or deployment manifest.
 - GitHub push, merge, and Vercel deployment require separate action-time user confirmation after identity checks.
 
@@ -84,7 +85,52 @@ git add frontend/lib/contracts/FirstFault.test.ts frontend/lib/contracts/FirstFa
 git commit -m "fix: reconcile current Studio Next calldata"
 ```
 
-### Task 2: Automated and live proof gates
+### Task 2: Empty SDK triggered-ID fallback
+
+**Files:**
+- Modify: `frontend/lib/contracts/FirstFault.test.ts:563-650`
+- Modify: `frontend/lib/contracts/FirstFault.ts:538-650`
+
+**Interfaces:**
+- Consumes: contract-history entries with `hash` and `triggered_by`, plus `getTriggeredTransactionIds({ hash })`.
+- Produces: `getTriggeredReceiptsByHash(hash, fallbackChildIds?)` that prefers non-empty SDK IDs and otherwise validates fallback receipts through the existing checks.
+
+- [ ] **Step 1: Make the live-format test reproduce the empty SDK result**
+
+Set `client.getTriggeredTransactionIds` to return `[]` and include the finalized child history entry with `triggered_by: parent.hash`. Keep the expected proof parent and child count unchanged.
+
+- [ ] **Step 2: Run the focused test and verify RED**
+
+```powershell
+npm --prefix frontend test -- lib/contracts/FirstFault.test.ts -t "empty triggered IDs"
+```
+
+Expected: FAIL because reconciliation hydrates zero child receipts and allocation comparison fails.
+
+- [ ] **Step 3: Add the wrong-parent negative test**
+
+Return no SDK IDs and a history child whose `triggered_by` is another hash. Assert reconciliation returns `null` and the unrelated child receipt is never hydrated.
+
+- [ ] **Step 4: Implement the bounded fallback**
+
+Expand the history entry type with `triggered_by`. Derive fallback hashes using an exact case-insensitive parent match. Pass them to `getTriggeredReceiptsByHash`; inside that method use them only when the SDK returns an empty list. Do not bypass its receipt-level validation.
+
+- [ ] **Step 5: Run both fallback tests and verify GREEN**
+
+```powershell
+npm --prefix frontend test -- lib/contracts/FirstFault.test.ts -t "triggered IDs"
+```
+
+Expected: positive empty-ID reconstruction and wrong-parent rejection both pass.
+
+- [ ] **Step 6: Commit the fallback**
+
+```powershell
+git add frontend/lib/contracts/FirstFault.test.ts frontend/lib/contracts/FirstFault.ts
+git commit -m "fix: recover Studio Next child receipts from history"
+```
+
+### Task 3: Automated and live proof gates
 
 **Files:**
 - Verify: `frontend/lib/contracts/FirstFault.test.ts`
@@ -133,7 +179,7 @@ git diff origin/main...HEAD --stat
 
 Expected: only the design, plan, regression tests, and parser fix are present; no secrets, caches, build output, or local instructions.
 
-### Task 3: Confirmed publication and fresh-browser proof
+### Task 4: Confirmed publication and fresh-browser proof
 
 **Files:**
 - No source changes expected.
