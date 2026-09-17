@@ -538,8 +538,12 @@ export default class FirstFault {
     return this.client.getTransaction({ hash });
   }
 
-  async getTriggeredReceiptsByHash(hash: TransactionHash): Promise<GenLayerTransaction[]> {
-    const childIds = await this.client.getTriggeredTransactionIds({ hash });
+  async getTriggeredReceiptsByHash(
+    hash: TransactionHash,
+    fallbackChildIds: TransactionHash[] = [],
+  ): Promise<GenLayerTransaction[]> {
+    const triggeredChildIds = await this.client.getTriggeredTransactionIds({ hash });
+    const childIds = triggeredChildIds.length > 0 ? triggeredChildIds : fallbackChildIds;
     const children = await Promise.all(
       childIds.map(async (childHash) => {
         await this.client.waitForTransactionReceipt({
@@ -627,7 +631,13 @@ export default class FirstFault {
     const history = await this.client.request({
       method: "sim_getTransactionsForAddress",
       params: [this.contractAddress],
-    }) as Array<{ hash?: TransactionHash; to_address?: string; type?: number; status?: string }>;
+    }) as Array<{
+      hash?: TransactionHash;
+      to_address?: string;
+      triggered_by?: string;
+      type?: number;
+      status?: string;
+    }>;
     const methods = ["accept_workflow", "adjudicate", "cancel_workflow", "execute_mutual_settlement"];
     for (const item of history) {
       if (!item.hash || item.type !== 2 || item.status !== "FINALIZED" || item.to_address?.toLowerCase() !== this.contractAddress.toLowerCase()) continue;
@@ -635,7 +645,11 @@ export default class FirstFault {
       const readable = String((parent.data?.calldata as { readable?: string } | undefined)?.readable ?? "");
       if (!matchesSettlementCall(readable, workflowId, methods)) continue;
       if (!readbackExecutionSucceeded(parent)) continue;
-      const children = await this.getTriggeredReceiptsByHash(item.hash);
+      const fallbackChildIds = history
+        .filter((candidate) => candidate.hash
+          && candidate.triggered_by?.toLowerCase() === item.hash?.toLowerCase())
+        .map((candidate) => candidate.hash as TransactionHash);
+      const children = await this.getTriggeredReceiptsByHash(item.hash, fallbackChildIds);
       const actual = new Map<string, bigint>();
       for (const child of children) addActual(actual, String(child.to_address ?? ""), BigInt(child.value ?? 0));
       if (sameAllocations(expected, actual)) return { parent, children };
