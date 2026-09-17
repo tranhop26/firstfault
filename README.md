@@ -46,6 +46,7 @@ FirstFault V3 is `INTENTIONALLY_FROZEN`. It has no admin verdict, upgrader, emer
 - Docker Desktop plus GenLayer Localnet for live integration tests
 - GenLayer CLI and `genvm-linter`
 - A funded Studio Next development wallet only when performing a confirmed deployment
+- Frontend release pins: `@genlayer/transaction-kit@0.1.0-rc.2`, `@genlayer/transaction-kit-react@0.1.0-rc.2`, and `genlayer-js@2.0.0-rc.1`
 
 Install dependencies:
 
@@ -70,7 +71,7 @@ An empty contract address is intentional before deployment. The frontend reports
 The Studio Next build uses:
 
 ```text
-NEXT_PUBLIC_CONTRACT_ADDRESS=
+NEXT_PUBLIC_CONTRACT_ADDRESS=0xf7136eDe8ba1761562fEcb2147609F3A2932c449
 NEXT_PUBLIC_CONTRACT_VERSION=v3
 ```
 
@@ -113,16 +114,17 @@ FirstFault V3 is deployed at [`0x9236A835741DF7f891613B5578753647C140124E`](http
 
 ## Live application
 
-The current public site at [https://firstfault.vercel.app](https://firstfault.vercel.app) still serves the historical Studionet V3 deployment. The Studio Next contract is finalized and verified; promoting the public site remains a separate deployment step.
+The public site at [https://firstfault.vercel.app](https://firstfault.vercel.app) is connected to the verified Studio Next V3 contract at [`0xf7136eDe8ba1761562fEcb2147609F3A2932c449`](https://explorer-studio-dev.genlayer.com/address/0xf7136eDe8ba1761562fEcb2147609F3A2932c449) on chain `61997`.
 
 ### Judge demo — no wallet required
 
 1. Open [FirstFault Production](https://firstfault.vercel.app).
-2. Paste `firstfault-v3-writer-breach-20260910-1` into **Workflow ID**.
-3. Select **Inspect case**.
-4. Confirm `FIRST_BREACH`, **Earliest material breach: step 2** (Writer), and **Transfers finalized** with one parent and three child transaction links.
+2. Paste `firstfault-studio-next-final-20260917-1` into **Workflow ID**.
+3. Select **Inspect case**; a wallet connection is not required for this readback.
+4. Verify the three submitted evidence artifacts, exact Writer → Publisher output lineage, `30 GEN` deposited, `0 GEN` reserved, and finalized payout proof.
+5. Open the [`accept_workflow` parent](https://explorer-studio-dev.genlayer.com/tx/0xd396f50e33e776b056251f6ff86bf40d7dbb35de39d0df1b98ba3f8a30f80c4d) and the three child transfers to [Researcher](https://explorer-studio-dev.genlayer.com/tx/0x8454136cef08bd373e50f0f0313955ec7b7d16981a2e605fc48b99558369a620), [Writer](https://explorer-studio-dev.genlayer.com/tx/0x9b4cdd19059374cf58abdf3399bef1f2f0e25321423cc0fd9a25519aa5ddc37b), and [Publisher](https://explorer-studio-dev.genlayer.com/tx/0x6c9050b30ab5e85c75e775d632262b437f621354355bb148fdb856e6dd5d5079).
 
-This workflow holds 1 simulated GEN for each of Research, Writing, and Publishing. Research is `COMPLIANT`; Writer is `MATERIAL_BREACH` for inventing an unsupported audience metric; Publisher is `COMPLIANT` because its brief required exact reproduction. The contract scheduled 1 simulated GEN to Researcher, 1 to Publisher, and the Writer hold back to Buyer. All three transfers finalized with credited value, and the contract balance returned to zero.
+This Studio Next happy path binds three distinct worker roles to `10 GEN` holds. Research, Writer, and Publisher each submitted contract-stored evidence; Publisher's output hash equals Writer's output hash exactly. Buyer acceptance scheduled all `30 GEN`, released the full reserved balance, and triggered three finalized, value-credited transfers of `10 GEN` to the stored recipients. Exact readback and receipt evidence is recorded in `deployments/studio-next-happy-path.json`.
 
 ## Golden Studionet dispute
 
@@ -159,9 +161,19 @@ The command uses the ignored local pending record when available. If that file c
 
 ## Evidence matrix
 
+Rows labeled **Studio Next** are the active Agent Tank deployment and judge demo. The remaining rows preserve earlier Studionet development evidence for audit history only.
+
 | Actor | Action | Contract method | Transaction | Finalized/success | Readback |
 |---|---|---|---|---|---|
 | Studio Next deployer | Deploy FirstFault V3 for Agent Tank | Contract deployment | [`0x48491d…76a0a`](https://explorer-studio-dev.genlayer.com/tx/0x48491dfc5f18ab2cdc6c74e37e9a427261c3964e5220c61c5e5178108af76a0a) | `FINALIZED` / `FINISHED_WITH_RETURN`; 3 validators agreed, 2 idle | [Studio Next address](https://explorer-studio-dev.genlayer.com/address/0xf7136eDe8ba1761562fEcb2147609F3A2932c449), exact source hash and 24-method schema verified |
+| Studio Next Buyer | Create the judge-demo workflow | `create_workflow` | [`0x8a5a42…cdf5db`](https://explorer-studio-dev.genlayer.com/tx/0x8a5a42d91b8e96b5c3efd99347ae4fac9f4b8029d87613d0a6b6546b88cdf5db) | `FINALIZED` / `SUCCESS` | `firstfault-studio-next-final-20260917-1` binds the exact actors and 10/10/10 GEN holds |
+| Studio Next Buyer | Prepare and fund 30 GEN | `prepare_funding`, `fund_workflow` | [`prepare`](https://explorer-studio-dev.genlayer.com/tx/0xbf8d0a1df0e1cd3af707f4264c5ecce4419fb0198c8c513bd562347efe035b3b), [`fund`](https://explorer-studio-dev.genlayer.com/tx/0x2e51f45d00f3958faee2b20a4f982a6f5816257322fc0b82c83eaa03e1c2dd28) | Both `FINALIZED` / `SUCCESS` | Contract accounting reads `30 GEN` deposited and reserved before settlement |
+| Studio Next Buyer | Start the workflow | `start_workflow` | [`0x9109c1…733b8`](https://explorer-studio-dev.genlayer.com/tx/0x9109c19cae3eb3b314f31db12dbeb5d9efcda57712131ab85c7509be16d733b8) | `FINALIZED` / `SUCCESS` | Contract advances the funded workflow into agent execution |
+| Studio Next Researcher | Submit network/finality research | `submit_step` | [`0x07d1d0…cc87e`](https://explorer-studio-dev.genlayer.com/tx/0x07d1d032a04accdb1f079477cf114caf7ac30cb25015627777341a7af8bcc87e) | `FINALIZED` / `SUCCESS` | Evidence `76a40c…79ff5` and output `8f7797…80cf5` read back from step 0 |
+| Studio Next Writer | Submit the bound summary | `submit_step` | [`0x500ab8…14408`](https://explorer-studio-dev.genlayer.com/tx/0x500ab8717137c9cb7b24a5ff55d54023259baa6155d4323cf04eed35f5c14408) | `FINALIZED` / `SUCCESS` | Writer upstream hash equals the Research output hash |
+| Studio Next Publisher | Publish the Writer artifact | `submit_step` | [`0xe5f7f2…46251`](https://explorer-studio-dev.genlayer.com/tx/0xe5f7f2133458ceefcb55480fd47d780c7b605fb1b15bdf97ef229c05c8546251) | `FINALIZED` / `SUCCESS` | Publisher output `5689f5…bc194` equals Writer output exactly |
+| Studio Next Buyer | Accept all completed work | `accept_workflow` | [`0xd396f5…f80c4d`](https://explorer-studio-dev.genlayer.com/tx/0xd396f50e33e776b056251f6ff86bf40d7dbb35de39d0df1b98ba3f8a30f80c4d) | `FINALIZED` / `SUCCESS` | `30 GEN` payout scheduled, `0 GEN` refund, `0 GEN` reserved; three related transfers emitted |
+| Studio Next contract | Execute all three payouts | Triggered external transfers | [`Researcher`](https://explorer-studio-dev.genlayer.com/tx/0x8454136cef08bd373e50f0f0313955ec7b7d16981a2e605fc48b99558369a620), [`Writer`](https://explorer-studio-dev.genlayer.com/tx/0x9b4cdd19059374cf58abdf3399bef1f2f0e25321423cc0fd9a25519aa5ddc37b), [`Publisher`](https://explorer-studio-dev.genlayer.com/tx/0x6c9050b30ab5e85c75e775d632262b437f621354355bb148fdb856e6dd5d5079) | All `FINALIZED`, value credited | Exact stored recipients receive `10 GEN` each; finalized payout total is `30 GEN` |
 | Deployer | Deploy frozen FirstFault source | Contract deployment | [`0x47b36d…19e1920`](https://explorer-studio.genlayer.com/tx/0x47b36dcc4b7843534f06f299272e96722086bff2f2c2c0daa983ed14119e1920) | `FINALIZED` / `FINISHED_WITH_RETURN` | [Address](https://explorer-studio.genlayer.com/address/0x2271AE904A97865491e4b24c49532f71B711eD5f), exact source hash and 17-method schema verified |
 | Deployer | Deploy frozen FirstFault V2 successor | Contract deployment | [`0x189c6d…1db2d`](https://explorer-studio.genlayer.com/tx/0x189c6d629cde61aff8893c3d8dcc45ea9908a0a4da95d6a3b7b5b5db3fd1db2d) | `FINALIZED` / `FINISHED_WITH_RETURN` | [V2 address](https://explorer-studio.genlayer.com/address/0x24c060E5394b5bD14a5546B055A7F049f9842987), exact source hash and 20-method schema verified |
 | Deployer | Deploy frozen FirstFault V3 successor | Contract deployment | [`0x9e3d32…b62fdc`](https://explorer-studio.genlayer.com/tx/0x9e3d328e3ec5a325ab25fffa26b006b692f7891d11de05703436304830b62fdc) | `FINALIZED` / `FINISHED_WITH_RETURN` | [V3 address](https://explorer-studio.genlayer.com/address/0x9236A835741DF7f891613B5578753647C140124E), exact source hash and 24-method schema verified |
@@ -180,7 +192,7 @@ The command uses the ignored local pending record when available. If that file c
 | V3 contract | Execute the production-demo settlement | Triggered external transfers | [`Research payout`](https://explorer-studio.genlayer.com/tx/0xa7dc45c69507f18dbec622493ca81b57b6831d71d09934c223bef4b8489db671), [`Publisher payout`](https://explorer-studio.genlayer.com/tx/0xc0c607bcccff569ac847a95817477956b513fd3d1456357d606ce28f0dc8bbb1), [`Writer-hold refund`](https://explorer-studio.genlayer.com/tx/0x689368c746f8afe06c637a7e47cd64fe0c0d026392f038bde5711c81a9f4949a) | All `FINALIZED`, value credited | Three transfers of 1 simulated GEN total the 3 GEN deposit; contract balance reads 0 |
 | Buyer after timeout | Preserve custody safely | `timeout_dispute_to_unresolved` | [`0xdf2b9f…6985e2`](https://explorer-studio.genlayer.com/tx/0xdf2b9f74f65b9e59678ecd9bcdb2594fe9d9fb3409b59dbe1f433bef4d6985e2) | `FINALIZED` / `SUCCESS` | `UNRESOLVED / CONSENSUS_TIMEOUT`; all 3 remains reserved, no payout/refund |
 
-Machine-readable deployment and exercised-flow evidence is recorded in `deployments/studio-next-v3.json`, `deployments/studionet.json`, `deployments/studionet-v2.json`, `deployments/studionet-v3.json`, `deployments/studionet-evidence.json`, `deployments/studionet-golden-demo.json`, `deployments/studionet-live-branches.json`, `deployments/studionet-v3-live-evidence.json`, `deployments/studionet-v3-dispute-evidence.json`, and `deployments/vercel.json`.
+Machine-readable active deployment and exercised-flow evidence is recorded in `deployments/studio-next-v3.json` and `deployments/studio-next-happy-path.json`. Historical Studionet evidence remains in `deployments/studionet.json`, `deployments/studionet-v2.json`, `deployments/studionet-v3.json`, `deployments/studionet-evidence.json`, `deployments/studionet-golden-demo.json`, `deployments/studionet-live-branches.json`, `deployments/studionet-v3-live-evidence.json`, `deployments/studionet-v3-dispute-evidence.json`, and `deployments/vercel.json`.
 
 ## Known limitations
 
