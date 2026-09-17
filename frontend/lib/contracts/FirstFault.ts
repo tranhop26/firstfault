@@ -13,6 +13,7 @@ import {
 } from "genlayer-js/types";
 import { hexToBytes, type Account, type Address } from "viem";
 import { GENLAYER_CHAIN } from "../genlayer/network";
+import type { Eip1193Provider } from "../genlayer/providers";
 
 export type FirstFaultWorkflow = {
   buyer: string;
@@ -158,6 +159,83 @@ export type FirstFaultFeeQuote = {
 };
 
 type ContractAccount = Account | Address;
+type UnknownRecord = Record<string, unknown>;
+type WriteFeeEstimate = {
+  distribution: FeesDistribution;
+  feeValue: bigint;
+  messageAllocations?: MessageFeeAllocationInput[];
+};
+
+function asRecord(value: unknown): UnknownRecord | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as UnknownRecord
+    : undefined;
+}
+
+function decodeStudioContractResult(result: unknown): string | undefined {
+  if (typeof result !== "string") return undefined;
+  try {
+    const bytes = Uint8Array.from(atob(result), (character) => character.charCodeAt(0));
+    if (bytes.length === 0) return undefined;
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes.slice(1));
+  } catch {
+    return undefined;
+  }
+}
+
+function simulationParamsForContractError(
+  error: unknown,
+  expectedMessage: string,
+): UnknownRecord | undefined {
+  const cause = asRecord(asRecord(error)?.cause);
+  const data = asRecord(cause?.data);
+  const receipt = asRecord(data?.receipt);
+  if (decodeStudioContractResult(receipt?.result) !== expectedMessage) return undefined;
+  return asRecord(data?.params);
+}
+
+function studioFeeInteger(value: unknown): bigint {
+  if (typeof value === "bigint" && value >= 0n) return value;
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
+  if (typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value)) {
+    return BigInt(value);
+  }
+  throw new Error("Studio fee simulation returned no valid recommended preset");
+}
+
+function normalizeStudioRecommendedPreset(result: unknown): WriteFeeEstimate {
+  const resultRecord = asRecord(result);
+  const receipt = asRecord(resultRecord?.receipt ?? resultRecord);
+  const preset = asRecord(asRecord(asRecord(receipt?.genvm_result)?.fee_accounting)?.recommended_fee_preset);
+  const distribution = asRecord(preset?.distribution);
+  if (!preset || !distribution) {
+    throw new Error("Studio fee simulation returned no valid recommended preset");
+  }
+  const messageAllocations = preset.messageAllocations;
+  if (messageAllocations !== undefined && !Array.isArray(messageAllocations)) {
+    throw new Error("Studio fee simulation returned no valid recommended preset");
+  }
+  return {
+    distribution: {
+      leaderTimeunitsAllocation: studioFeeInteger(distribution.leaderTimeunitsAllocation),
+      validatorTimeunitsAllocation: studioFeeInteger(distribution.validatorTimeunitsAllocation),
+      appealRounds: studioFeeInteger(distribution.appealRounds),
+      executionBudgetPerRound: studioFeeInteger(distribution.executionBudgetPerRound),
+      executionConsumed: studioFeeInteger(distribution.executionConsumed),
+      totalMessageFees: studioFeeInteger(distribution.totalMessageFees),
+      rotations: Array.isArray(distribution.rotations)
+        ? distribution.rotations.map(studioFeeInteger)
+        : (() => { throw new Error("Studio fee simulation returned no valid recommended preset"); })(),
+      maxPriceGenPerTimeUnit: studioFeeInteger(distribution.maxPriceGenPerTimeUnit),
+      storageFeeMaxGasPrice: studioFeeInteger(distribution.storageFeeMaxGasPrice),
+      receiptFeeMaxGasPrice: studioFeeInteger(distribution.receiptFeeMaxGasPrice),
+    },
+    feeValue: studioFeeInteger(preset.feeValue),
+    ...(messageAllocations !== undefined
+      ? { messageAllocations: messageAllocations as MessageFeeAllocationInput[] }
+      : {}),
+  };
+}
 
 function asContractAddress(address: Address): CalldataAddress {
   return new CalldataAddress(hexToBytes(address));
@@ -170,12 +248,23 @@ function parseContractJson<T>(value: unknown): T {
   return JSON.parse(value) as T;
 }
 
-function executionSucceeded(receipt: GenLayerTransaction): boolean {
-  if (receipt.txExecutionResultName) {
-    return receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN;
-  }
+function hasAffirmativeExecutionEvidence(receipt: GenLayerTransaction): boolean {
+  const transactionExecution = receipt.txExecutionResultName as string | undefined;
   const leaderExecution = receipt.consensus_data?.leader_receipt?.[0]?.execution_result;
-  if (leaderExecution) return leaderExecution === "SUCCESS";
+  // Studio Next's SUCCESS name is compatible with a successful leader receipt.
+  if (transactionExecution !== undefined
+    && transactionExecution !== ExecutionResult.FINISHED_WITH_RETURN
+    && transactionExecution !== "SUCCESS") return false;
+  if (leaderExecution !== undefined && leaderExecution !== "SUCCESS") return false;
+  return transactionExecution === ExecutionResult.FINISHED_WITH_RETURN || leaderExecution === "SUCCESS";
+}
+
+function readbackExecutionSucceeded(receipt: GenLayerTransaction): boolean {
+  if (receipt.txExecutionResultName !== undefined
+    || receipt.consensus_data?.leader_receipt?.[0]?.execution_result !== undefined) {
+    return hasAffirmativeExecutionEvidence(receipt);
+  }
+  // Majority-only compatibility is restricted to historical reconciliation.
   return receipt.statusName === TransactionStatus.FINALIZED
     && (
       receipt.resultName === TransactionResult.MAJORITY_AGREE
@@ -187,8 +276,7 @@ function executionSucceeded(receipt: GenLayerTransaction): boolean {
 function submittedWriteSucceeded(receipt: GenLayerTransaction): boolean {
   const decided = receipt.statusName === TransactionStatus.ACCEPTED
     || receipt.statusName === TransactionStatus.FINALIZED;
-  return decided
-    && receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_RETURN;
+  return decided && hasAffirmativeExecutionEvidence(receipt);
 }
 
 /** Headless FirstFault contract boundary shared by browser code and Localnet tests. */
@@ -203,6 +291,7 @@ export default class FirstFault {
     private readonly version: "v1" | "v2" | "v3" = "v1",
     private readonly confirmFee?: (quote: FirstFaultFeeQuote) => Promise<void>,
     private readonly validateBeforeSubmit?: () => Promise<void>,
+    private readonly provider?: Eip1193Provider,
   ) {
     this.client = this.makeClient(account);
   }
@@ -212,12 +301,41 @@ export default class FirstFault {
       chain: this.endpoint ? localnet : GENLAYER_CHAIN,
       ...(this.endpoint ? { endpoint: this.endpoint } : {}),
       ...(account ? { account } : {}),
+      ...(!this.endpoint && this.provider ? { provider: this.provider } : {}),
     });
   }
 
   updateAccount(account: ContractAccount): void {
     this.account = account;
     this.client = this.makeClient(account);
+  }
+
+  private async estimateWriteFees(
+    request: Parameters<ReturnType<typeof createClient>["estimateTransactionFeesForWrite"]>[0],
+  ): Promise<WriteFeeEstimate> {
+    try {
+      return await this.client.estimateTransactionFeesForWrite(request);
+    } catch (error) {
+      const expectedMessage =
+        request.functionName === "prepare_funding"
+          ? "Invalid funding intent expiry"
+          : request.functionName === "submit_step" || request.functionName === "submit_cure"
+            ? "Observation is in the future"
+            : undefined;
+      if (!expectedMessage) throw error;
+      const params = simulationParamsForContractError(error, expectedMessage);
+      if (!params) throw error;
+      const result = await (this.client as unknown as {
+        request(args: { method: string; params: [UnknownRecord] }): Promise<unknown>;
+      }).request({
+        method: "sim_estimateTransactionFees",
+        params: [{
+          ...params,
+          sim_config: { genvm_datetime: new Date().toISOString() },
+        }],
+      });
+      return normalizeStudioRecommendedPreset(result);
+    }
   }
 
   private async write(functionName: string, args: unknown[], value = 0n) {
@@ -230,7 +348,7 @@ export default class FirstFault {
     };
     const estimate = this.endpoint
       ? undefined
-      : await this.client.estimateTransactionFeesForWrite(request);
+      : await this.estimateWriteFees(request);
     if (estimate && this.confirmFee) {
       const accountAddress = typeof this.account === "string" ? this.account : this.account.address;
       await this.confirmFee({
@@ -265,7 +383,7 @@ export default class FirstFault {
       retries: this.endpoint ? 600 : 120,
     });
     if (!submittedWriteSucceeded(receipt)) {
-      throw new Error(`FirstFault ${functionName} reached a decision without FINISHED_WITH_RETURN`);
+      throw new Error(`FirstFault ${functionName} reached a decision without successful execution evidence`);
     }
     return receipt;
   }
@@ -516,7 +634,7 @@ export default class FirstFault {
       const parent = await this.client.getTransaction({ hash: item.hash });
       const readable = String((parent.data?.calldata as { readable?: string } | undefined)?.readable ?? "");
       if (!matchesSettlementCall(readable, workflowId, methods)) continue;
-      if (!executionSucceeded(parent)) continue;
+      if (!readbackExecutionSucceeded(parent)) continue;
       const children = await this.getTriggeredReceiptsByHash(item.hash);
       const actual = new Map<string, bigint>();
       for (const child of children) addActual(actual, String(child.to_address ?? ""), BigInt(child.value ?? 0));

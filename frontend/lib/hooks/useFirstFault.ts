@@ -12,8 +12,9 @@ import FirstFault, {
   type FirstFaultFeeQuote,
 } from "@/lib/contracts/FirstFault";
 import type { FundingPhase } from "@/components/firstfault/FundingPanel";
-import { GENLAYER_CHAIN_ID, getContractAddress, getContractVersion } from "@/lib/genlayer/client";
+import { getContractAddress, getContractVersion } from "@/lib/genlayer/client";
 import { useWallet } from "@/lib/genlayer/WalletProvider";
+import { validateSelectedWalletBeforeSubmit } from "@/lib/genlayer/walletValidation";
 import { projectTransactionStatus, type TransactionEvidence } from "@/lib/firstfault/status";
 import {
   clearReconciliationHash,
@@ -23,6 +24,7 @@ import {
   writeReconciliationHash,
 } from "@/lib/firstfault/reconciliationStorage";
 import { runExclusiveWrite } from "@/lib/firstfault/writeGate";
+import { observationTimestamp } from "../firstfault/observationTimestamp";
 
 function evidence(receipt: GenLayerTransaction): TransactionEvidence {
   const externalTransferSucceeded = receipt.type === 0 && receipt.statusName === TransactionStatus.FINALIZED;
@@ -61,20 +63,10 @@ export function useFirstFault(workflowId: string) {
     setFeeApproval(quote);
   }), []);
   const validateBeforeSubmit = useCallback(async () => {
-    const provider = window.ethereum;
+    const provider = wallet.provider;
     if (!provider || !wallet.address) throw new Error("Wallet disconnected before signing");
-    const [rawChainId, rawAccounts] = await Promise.all([
-      provider.request({ method: "eth_chainId" }),
-      provider.request({ method: "eth_accounts" }),
-    ]);
-    const chainId = typeof rawChainId === "string" ? Number.parseInt(rawChainId, 16) : Number(rawChainId);
-    const accounts = Array.isArray(rawAccounts) ? rawAccounts : [];
-    const activeAddress = typeof accounts[0] === "string" ? accounts[0] : "";
-    if (chainId !== GENLAYER_CHAIN_ID) throw new Error("Wallet network changed before signing; switch back to Studio Next");
-    if (activeAddress.toLowerCase() !== wallet.address.toLowerCase()) {
-      throw new Error("Wallet account changed before signing; review the fee again");
-    }
-  }, [wallet.address]);
+    await validateSelectedWalletBeforeSubmit(provider, wallet.address);
+  }, [wallet.address, wallet.provider]);
   const contract = useMemo(
     () => configured ? new FirstFault(
       configuredAddress as Address,
@@ -92,8 +84,9 @@ export function useFirstFault(workflowId: string) {
       contractVersion,
       confirmFee,
       validateBeforeSubmit,
+      wallet.provider ?? undefined,
     ) : null,
-    [configured, configuredAddress, contractVersion, confirmFee, reconciliationKey, validateBeforeSubmit, wallet.address],
+    [configured, configuredAddress, contractVersion, confirmFee, reconciliationKey, validateBeforeSubmit, wallet.address, wallet.provider],
   );
   const [receipt, setReceipt] = useState<TransactionEvidence | null>(null);
   const [children, setChildren] = useState<TransactionEvidence[]>([]);
@@ -358,7 +351,7 @@ export function useFirstFault(workflowId: string) {
     fund,
     start: () => run(() => contract!.startWorkflow(workflowId, nonce("start"))),
     submitStep: (stepIndex: number, output: string, upstreamHash: string, sourceUrl: string) =>
-      run(async () => (await contract!.submitStep(workflowId, stepIndex, output, upstreamHash, sourceUrl, BigInt(Math.floor(Date.now() / 1000)), nonce(`step-${stepIndex}`))).receipt),
+      run(async () => (await contract!.submitStep(workflowId, stepIndex, output, upstreamHash, sourceUrl, observationTimestamp(), nonce(`step-${stepIndex}`))).receipt),
     accept: () => run(() => contract!.acceptWorkflow(workflowId, nonce("accept"))),
     dispute: (reason: string) => run(() => contract!.openDispute(workflowId, reason, nonce("dispute"))),
     adjudicate: () => run(() => contract!.adjudicate(workflowId, nonce("adjudicate"))),
@@ -367,7 +360,7 @@ export function useFirstFault(workflowId: string) {
     timeoutIncomplete: () => run(() => contract!.timeoutIncompleteToUnresolved(workflowId, nonce("timeout-incomplete"))),
     timeoutReview: () => run(() => contract!.timeoutReviewToUnresolved(workflowId, nonce("timeout-review"))),
     retryAdjudication: () => run(() => contract!.retryAdjudication(workflowId, nonce("retry-adjudication"))),
-    submitCure: (evidenceText: string, sourceUrl: string) => run(() => contract!.submitCure(workflowId, evidenceText, sourceUrl, BigInt(Math.floor(Date.now() / 1000)), nonce("cure"))),
+    submitCure: (evidenceText: string, sourceUrl: string) => run(() => contract!.submitCure(workflowId, evidenceText, sourceUrl, observationTimestamp(), nonce("cure"))),
     proposeSettlement: (amounts: readonly [bigint, bigint, bigint, bigint]) => run(() => contract!.proposeMutualSettlement(workflowId, amounts, nonce("proposal"))),
     approveSettlement: (version: bigint, hash: string) => run(() => contract!.approveMutualSettlement(workflowId, version, hash, nonce("approval"))),
     executeSettlement: () => run(() => contract!.executeMutualSettlement(workflowId, nonce("execute-settlement"))),

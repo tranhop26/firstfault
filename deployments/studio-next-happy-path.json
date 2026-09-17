@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "project": "FirstFault",
+  "network": {
+    "name": "Studio Next",
+    "rpcUrl": "https://studio-next.genlayer.com/api",
+    "chainId": 61997,
+    "explorerUrl": "https://explorer-studio-dev.genlayer.com"
+  },
+  "contract": {
+    "version": "v3",
+    "address": "0xf7136eDe8ba1761562fEcb2147609F3A2932c449",
+    "deploymentTransactionHash": "0x48491dfc5f18ab2cdc6c74e37e9a427261c3964e5220c61c5e5178108af76a0a",
+    "explorerUrl": "https://explorer-studio-dev.genlayer.com/address/0xf7136eDe8ba1761562fEcb2147609F3A2932c449"
+  },
+  "workflow": {
+    "id": "firstfault-studio-next-final-20260917-1",
+    "buyer": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "orchestrator": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+    "workers": {
+      "research": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "writer": "0x70dbCE2459FC9771a2110c14F4F93C08e16975d4",
+      "publisher": "0x38c06bce3459949570A337BDC734CD5225d31985"
+    },
+    "holdsGen": [
+      "10",
+      "10",
+      "10"
+    ]
+  },
+  "transactions": [
+    {
+      "action": "create_workflow",
+      "transactionHash": "0x8a5a42d91b8e96b5c3efd99347ae4fac9f4b8029d87613d0a6b6546b88cdf5db",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS",
+      "explorerUrl": "https://explorer-studio-dev.genlayer.com/tx/0x8a5a42d91b8e96b5c3efd99347ae4fac9f4b8029d87613d0a6b6546b88cdf5db"
+    },
+    {
+      "action": "prepare_funding",
+      "transactionHash": "0xbf8d0a1df0e1cd3af707f4264c5ecce4419fb0198c8c513bd562347efe035b3b",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS",
+      "explorerUrl": "https://explorer-studio-dev.genlayer.com/tx/0xbf8d0a1df0e1cd3af707f4264c5ecce4419fb0198c8c513bd562347efe035b3b"
+    },
+    {
+      "action": "fund_workflow",
+      "transactionHash": "0x2e51f45d00f3958faee2b20a4f982a6f5816257322fc0b82c83eaa03e1c2dd28",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS",
+      "explorerUrl": "https://explorer-studio-dev.genlayer.com/tx/0x2e51f45d00f3958faee2b20a4f982a6f5816257322fc0b82c83eaa03e1c2dd28"
+    },
+    {
+      "action": "start_workflow",
+      "transactionHash": "0x9109c19cae3eb3b314f31db12dbeb5d9efcda57712131ab85c7509be16d733b8",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS",
+      "explorerUrl": "https://explorer-studio-dev.genlayer.com/tx/0x9109c19cae3eb3b314f31db12dbeb5d9efcda57712131ab85c7509be16d733b8"
+    },
+    {
+      "action": "submit_research",
+      "transactionHash": "0x07d1d032a04accdb1f079477cf114caf7ac30cb25015627777341a7af8bcc87e",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS",
+      "explorerUrl": "https://explorer-studio-dev.genlayer.com/tx/0x07d1d032a04accdb1f079477cf114caf7ac30cb25015627777341a7af8bcc87e"
+    },
+    {
+      "action": "submit_writer",
+      "transactionHash": "0x500ab8717137c9cb7b24a5ff55d54023259baa6155d4323cf04eed35f5c14408",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS",
+      "explorerUrl": "https://explorer-studio-dev.genlayer.com/tx/0x500ab8717137c9cb7b24a5ff55d54023259baa6155d4323cf04eed35f5c14408"
+    },
+    {
+      "action": "submit_publisher",
+      "transactionHash": "0xe5f7f2133458ceefcb55480fd47d780c7b605fb1b15bdf97ef229c05c8546251",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS",
+      "explorerUrl": "https://explorer-studio-dev.genlayer.com/tx/0xe5f7f2133458ceefcb55480fd47d780c7b605fb1b15bdf97ef229c05c8546251"
+    },
+    {
+      "action": "accept_workflow",
+      "transactionHash": "0xd396f50e33e776b056251f6ff86bf40d7dbb35de39d0df1b98ba3f8a30f80c4d",
+      "status": "FINALIZED",
+      "executionResult": "SUCCESS",
+      "relatedTransactionCount": 3,
+      "explorerUrl": "https://explorer-studio-dev.genlayer.com/tx/0xd396f50e33e776b056251f6ff86bf40d7dbb35de39d0df1b98ba3f8a30f80c4d"
+    }
+  ],
+  "evidence": [
+    {
+      "step": 0,
+      "role": "Research",
+      "evidenceHash": "76a40c70f6e3c1168ec6fc72764726e8605158ef254dc16c72bb551569879ff5",
+      "outputHash": "8f7797d9b5d77bc04f7bd6252ea080dc3b8e4f902c4c74c6c8e1a8e2ebd80cf5",
+      "upstreamOutputHash": ""
+    },
+    {
+      "step": 1,
+      "role": "Writer",
+      "evidenceHash": "3ac194e473f9c5cf53fea9b515724d93a55e27f5fe81cef0ad9dd72881f1766e",
+      "outputHash": "5689f5f2a63515385374e1268165c2b448eae5fd7bc386717b63a932b36bc194",
+      "upstreamOutputHash": "8f7797d9b5d77bc04f7bd6252ea080dc3b8e4f902c4c74c6c8e1a8e2ebd80cf5",
+      "upstreamHashMatches": true
+    },
+    {
+      "step": 2,
+      "role": "Publisher",
+      "evidenceHash": "2c28d03c7fa9b7080f2d60996cb5611adc28811184a0265f470fc022e2cd3d07",
+      "outputHash": "5689f5f2a63515385374e1268165c2b448eae5fd7bc386717b63a932b36bc194",
+      "upstreamOutputHash": "5689f5f2a63515385374e1268165c2b448eae5fd7bc386717b63a932b36bc194",
+      "upstreamHashMatches": true
+    }
+  ],
+  "readback": {
+    "state": "ACCEPTED_PENDING_FINALITY",
+    "outcome": "ACCEPTED_PENDING_FINALITY",
+    "settlementFinality": "FINALIZED",
+    "accounting": {
+      "deposited": "30",
+      "payoutScheduled": "30",
+      "finalizedPayout": "30",
+      "refundScheduled": "0",
+      "reserved": "0"
+    }
+  },
+  "transfers": [
+    {
+      "role": "Researcher",
+      "to": "0x21b45103dd05c43969daF3CbB4277391777e2eC7",
+      "valueGen": "10",
+      "transactionHash": "0x8454136cef08bd373e50f0f0313955ec7b7d16981a2e605fc48b99558369a620",
+      "status": "FINALIZED",
+      "valueCredited": true,
+      "triggeredBy": "0xd396f50e33e776b056251f6ff86bf40d7dbb35de39d0df1b98ba3f8a30f80c4d",
+      "explorerUrl": "https://explorer-studio-dev.genlayer.com/tx/0x8454136cef08bd373e50f0f0313955ec7b7d16981a2e605fc48b99558369a620"
+    },
+    {
+      "role": "Writer",
+      "to": "0x70dbCE2459FC9771a2110c14F4F93C08e16975d4",
+      "valueGen": "10",
+      "transactionHash": "0x9b4cdd19059374cf58abdf3399bef1f2f0e25321423cc0fd9a25519aa5ddc37b",
+      "status": "FINALIZED",
+      "valueCredited": true,
+      "triggeredBy": "0xd396f50e33e776b056251f6ff86bf40d7dbb35de39d0df1b98ba3f8a30f80c4d",
+      "explorerUrl": "https://explorer-studio-dev.genlayer.com/tx/0x9b4cdd19059374cf58abdf3399bef1f2f0e25321423cc0fd9a25519aa5ddc37b"
+    },
+    {
+      "role": "Publisher",
+      "to": "0x38c06bce3459949570A337BDC734CD5225d31985",
+      "valueGen": "10",
+      "transactionHash": "0x6c9050b30ab5e85c75e775d632262b437f621354355bb148fdb856e6dd5d5079",
+      "status": "FINALIZED",
+      "valueCredited": true,
+      "triggeredBy": "0xd396f50e33e776b056251f6ff86bf40d7dbb35de39d0df1b98ba3f8a30f80c4d",
+      "explorerUrl": "https://explorer-studio-dev.genlayer.com/tx/0x6c9050b30ab5e85c75e775d632262b437f621354355bb148fdb856e6dd5d5079"
+    }
+  ]
+}

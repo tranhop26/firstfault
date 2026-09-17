@@ -40,7 +40,7 @@ For `FIRST_BREACH`, compliant steps pay their stored workers and the breached st
 
 The hard part is a semantic question: did each agent satisfy its written brief using the evidence available at that step, and which failure first caused the buyer's rejection? Deterministic contracts cannot reliably answer that question from natural-language artifacts and web evidence. GenLayer provides validator consensus over the semantic evidence while the contract preserves authorization, replay protection, custody accounting, safe failure, and the final transfer consequences.
 
-The validator result does not merely decorate an off-chain workflow. It changes contract state and determines how simulated Studionet GEN is allocated.
+The validator result does not merely decorate an off-chain workflow. It changes contract state and determines how simulated Studio Next GEN is allocated.
 
 ## Workflow
 
@@ -58,37 +58,34 @@ Recovery includes evidence-bound cures, unanimous four-party mutual settlement, 
 ## Live judge demo — no wallet required
 
 1. Open https://firstfault.vercel.app
-2. Paste `firstfault-v3-writer-breach-20260910-1` into **Workflow ID**.
-3. Select **Inspect case**.
-4. Confirm:
-   - `FIRST_BREACH`
-   - Earliest material breach: Writer, UI step 2 / contract step index `1`
-   - Research `COMPLIANT`
-   - Writer `MATERIAL_BREACH`
-   - Publisher `COMPLIANT`
-   - `Transfers finalized` with one parent and three child explorer links
+2. Paste `firstfault-studio-next-final-20260917-1` into **Workflow ID**.
+3. Select **Inspect case**; no wallet connection is required for readback.
+4. Verify three submitted evidence artifacts, the exact Research → Writer → Publisher lineage, `30 GEN` deposited, and `0 GEN` reserved.
+5. Open the `accept_workflow` parent and all three child explorer links. Each child is `FINALIZED`, credits `10 GEN` to the stored Researcher, Writer, or Publisher address, and totals `30 GEN`.
 
-The demonstration uses three holds of 1 simulated Studionet GEN. Research correctly reports that the IANA example-domains source contains no audience metric. Writer invents “250,000 users in one week,” violating its brief. Publisher reproduces that artifact exactly as its own brief requires. GenLayer identifies Writer as the first material breach. The contract pays 1 GEN to Researcher, pays 1 GEN to Publisher, and refunds the Writer hold of 1 GEN to Buyer. All transfers finalized and were value-credited; the contract balance returned to zero.
+This featured Studio Next flow proves real contract calls, persistent state, versioned funding, actor authorization, evidence lineage, custody accounting, fees, and external settlement. It is intentionally the happy path, not the semantic-dispute example. The same deployed contract invokes GenLayer validator consensus when a buyer opens a concrete natural-language evidence dispute; that is where FirstFault determines the earliest material causal breach and changes the payout/refund allocation.
 
 ## Verified proof
 
-- V3 contract: https://explorer-studio.genlayer.com/address/0x9236A835741DF7f891613B5578753647C140124E
-- Deployment transaction: https://explorer-studio.genlayer.com/tx/0x9e3d328e3ec5a325ab25fffa26b006b692f7891d11de05703436304830b62fdc
-- Adjudication transaction: https://explorer-studio.genlayer.com/tx/0xd3fecdeafbb30c7382a32dced6f8eab2438aa90e4eba25565cc24047def4f512
-- Research payout: https://explorer-studio.genlayer.com/tx/0xa7dc45c69507f18dbec622493ca81b57b6831d71d09934c223bef4b8489db671
-- Publisher payout: https://explorer-studio.genlayer.com/tx/0xc0c607bcccff569ac847a95817477956b513fd3d1456357d606ce28f0dc8bbb1
-- Writer-hold refund: https://explorer-studio.genlayer.com/tx/0x689368c746f8afe06c637a7e47cd64fe0c0d026392f038bde5711c81a9f4949a
+- Network: Studio Next, chain ID `61997`, RPC `https://studio-next.genlayer.com/api`
+- Studio Next V3 contract: https://explorer-studio-dev.genlayer.com/address/0xf7136eDe8ba1761562fEcb2147609F3A2932c449
+- Deployment transaction: https://explorer-studio-dev.genlayer.com/tx/0x48491dfc5f18ab2cdc6c74e37e9a427261c3964e5220c61c5e5178108af76a0a
+- Accept-all parent: https://explorer-studio-dev.genlayer.com/tx/0xd396f50e33e776b056251f6ff86bf40d7dbb35de39d0df1b98ba3f8a30f80c4d
+- Researcher payout: https://explorer-studio-dev.genlayer.com/tx/0x8454136cef08bd373e50f0f0313955ec7b7d16981a2e605fc48b99558369a620
+- Writer payout: https://explorer-studio-dev.genlayer.com/tx/0x9b4cdd19059374cf58abdf3399bef1f2f0e25321423cc0fd9a25519aa5ddc37b
+- Publisher payout: https://explorer-studio-dev.genlayer.com/tx/0x6c9050b30ab5e85c75e775d632262b437f621354355bb148fdb856e6dd5d5079
 - Repository: https://github.com/tranhop26/firstfault
 - Production: https://firstfault.vercel.app
-- Machine-readable dispute proof: `deployments/studionet-v3-dispute-evidence.json`
+- Demo video: https://www.youtube.com/watch?v=yV5kURhk76g
+- Machine-readable happy-path proof: `deployments/studio-next-happy-path.json`
 
-The V3 source is fixed at commit `6e4b3b8a632ee519d571674af0b5e64bfc6d74e1`, SHA-256 `7164c7edf6bd2def6dce69615b4acce0f8899ffa7fa094b8cd59f6c1df426617`, with the verified 24-method schema recorded in `deployments/studionet-v3.json`. The contract is deployed on Studionet chain ID `61999` and is classified `INTENTIONALLY_FROZEN`.
+The deployed V3 source is fixed at commit `e9042b0a83afa39cd669cf0ec6e9896d68930034`, SHA-256 `be9a66f6f0a4f694024615f841c362eda8f463fd02ce4d16d4cffbb84dbb0e06`, with the verified 24-method schema recorded in `deployments/studio-next-v3.json`. The active contract is deployed on Studio Next chain ID `61997` and is classified `INTENTIONALLY_FROZEN`. Earlier Studionet receipts remain historical development evidence only.
 
 ## Built with
 
 - GenLayer Intelligent Contracts and validator semantic consensus
 - Python contract source with direct and Localnet integration tests
-- `genlayer-js` for writes, finalized receipts, contract readback, and triggered-transfer reconciliation
+- `@genlayer/transaction-kit@0.1.0-rc.2`, `@genlayer/transaction-kit-react@0.1.0-rc.2`, and `genlayer-js@2.0.0-rc.1`
 - Next.js, React, TypeScript, and Tailwind CSS
 - Vercel for the public frontend
 
@@ -109,7 +106,7 @@ FirstFault does more than ask AI whether an output is good. It assigns responsib
 
 ## Limitations
 
-- All GEN shown is simulated Studionet test value, not production money.
+- All GEN shown is simulated Studio Next test value, not production money.
 - V3 is intentionally frozen. Behavioral changes require a separately reviewed successor; existing holds cannot be silently migrated.
 - `UNRESOLVED` deliberately retains disputed value until a contract-governed cure, retry, mutual settlement, or documented successor strategy succeeds.
 - External transfer receipts are the execution proof; contract fields such as payout/refund scheduled record the intended allocation and are not presented as recipient-balance proof by themselves.
@@ -126,35 +123,35 @@ FirstFault does more than ask AI whether an output is good. It assigns responsib
 
 GenLayer finds the first material breach in a paid multi-agent workflow, then settles each evidence-bound hold with verifiable transfer receipts.
 
-**Project overview (993/1000):**
+**Project overview (maximum 1000 characters):**
 
-FirstFault resolves responsibility in a paid Research → Writer → Publisher workflow. Each worker submits an artifact bound to its brief, identity, upstream output, source snapshot, version, and time. If the buyer disputes delivery, the GenLayer Intelligent Contract asks validators to find the earliest material causal breach. The decision changes on-chain settlement: compliant milestones pay their stored workers, the breached hold returns to the buyer, and insufficient evidence becomes UNRESOLVED with value reserved. In the live V3 demo, Research correctly reports that IANA publishes no audience metric, Writer invents “250,000 users in one week,” and Publisher reproduces that artifact exactly as required. Consensus marks Writer as the first breach. Three finalized child receipts prove 1 simulated GEN paid to Researcher, 1 paid to Publisher, and 1 refunded to Buyer; the contract balance returns to zero. No buyer, deployer, backend, or frontend can choose the verdict or recipients.
+FirstFault resolves responsibility in a paid Research → Writer → Publisher workflow. Each artifact is bound on-chain to its brief, worker, upstream output, evidence, version, and time. If the buyer disputes delivery, GenLayer validators determine the earliest material causal breach; compliant holds pay workers, the breached hold returns to the buyer, and insufficient evidence stays reserved as UNRESOLVED. The Studio Next judge demo proves the surrounding trust path end to end: real contract calls, 30 GEN custody, three evidence submissions with exact lineage, buyer acceptance, and three finalized 10 GEN child payouts to stored recipients. The production UI reads this state without a wallet and exposes the parent and child receipts. No buyer, deployer, backend, or frontend can rewrite the verdict, recipients, or accounting.
 
-**Demo video:** https://www.youtube.com/watch?v=dByU9s1dngc
+**Demo video:** https://www.youtube.com/watch?v=yV5kURhk76g
 
-**How-to step 1 heading:** Open the current V3 dispute
+**How-to step 1 heading:** Open the Studio Next workflow
 
 **How-to step 1 instruction:**
 
-Open https://firstfault.vercel.app. Paste `firstfault-v3-writer-breach-20260910-1` into **Workflow ID** and select **Inspect case**. No wallet connection is required.
+Open https://firstfault.vercel.app. Paste `firstfault-studio-next-final-20260917-1` into **Workflow ID** and select **Inspect case**. No wallet connection is required.
 
-**How-to step 2 heading:** Verify the causal verdict
+**How-to step 2 heading:** Verify evidence and custody
 
 **How-to step 2 instruction:**
 
-Confirm `FIRST_BREACH` and **Earliest material breach: step 2** (Writer). Check Research = `COMPLIANT`, Writer = `MATERIAL_BREACH`, and Publisher = `COMPLIANT`. Publisher remains compliant because its brief required exact reproduction of the Writer artifact.
+Confirm three submitted evidence artifacts and exact Research → Writer → Publisher upstream lineage. Check that Publisher's output hash equals Writer's output hash, deposited value is `30 GEN`, and reserved value is `0 GEN` after acceptance.
 
 **How-to step 3 heading:** Verify settlement receipts
 
 **How-to step 3 instruction:**
 
-Confirm **Transfers finalized**. Open the parent adjudication and all three child explorer links. The children show 1 simulated GEN paid to Researcher, 1 paid to Publisher, and the 1-GEN Writer hold refunded to Buyer; total 3 GEN and reserved balance 0.
+Confirm **Transfers finalized**. Open the `accept_workflow` parent and all three child explorer links. The children show `10 GEN` credited to each stored Researcher, Writer, and Publisher address; total finalized payout is `30 GEN`.
 
-**Expected verification outcome (382/500):**
+**Expected verification outcome (maximum 500 characters):**
 
-Without a wallet, the live UI reconstructs the V3 dispute as `FIRST_BREACH` at Writer (contract index 1 / UI step 2), with Research and Publisher `COMPLIANT`. It shows 2 simulated GEN payout scheduled, 1 refunded, 0 reserved, and **Transfers finalized**. The parent adjudication and three child receipts reconcile exact stored recipients and 3 GEN total value; the contract balance is zero.
+Without a wallet, the UI reconstructs the Studio Next workflow with all three submitted evidence artifacts and exact upstream lineage. It shows `30 GEN` deposited, `30 GEN` payout scheduled, `0 GEN` refunded, `0 GEN` reserved, and **Transfers finalized**. The finalized parent and three child receipts reconcile the stored recipients at `10 GEN` each.
 
-**Contract link:** https://explorer-studio.genlayer.com/address/0x9236A835741DF7f891613B5578753647C140124E
+**Contract link:** https://explorer-studio-dev.genlayer.com/address/0xf7136eDe8ba1761562fEcb2147609F3A2932c449
 
 **Website:** https://firstfault.vercel.app
 
